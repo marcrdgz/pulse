@@ -1,0 +1,49 @@
+name: Pulse
+options:
+  bundleIdPrefix: dev.doblefilo
+  deploymentTarget:
+    macOS: "14.0"
+  createIntermediateGroups: true
+settings:
+  base:
+    SWIFT_VERSION: "6.0"
+    SWIFT_DEFAULT_ACTOR_ISOLATION: MainActor
+    MARKETING_VERSION: "0.2.0"
+    CURRENT_PROJECT_VERSION: "1"
+targets:
+  Pulse:
+    type: application
+    platform: macOS
+    sources: [Pulse]
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: dev.doblefilo.pulse
+        PRODUCT_NAME: Pulse
+        GENERATE_INFOPLIST_FILE: YES
+        INFOPLIST_KEY_CFBundleDisplayName: Pulse
+        INFOPLIST_KEY_LSApplicationCategoryType: public.app-category.productivity
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        CODE_SIGN_IDENTITY: "-"
+        ENABLE_HARDENED_RUNTIME: YES
+        ENABLE_APP_SANDBOX: YES
+        ENABLE_OUTGOING_NETWORK_CONNECTIONS: YES
+        ENABLE_USER_SELECTED_FILES: readwrite
+  PulseTests:
+    type: bundle.unit-test
+    platform: macOS
+    sources: [PulseTests]
+    dependencies:
+      - target: Pulse
+    settings:
+      base:
+        GENERATE_INFOPLIST_FILE: YES
+        TEST_HOST: "$(BUILT_PRODUCTS_DIR)/Pulse.app/Contents/MacOS/Pulse"
+        BUNDLE_LOADER: "$(TEST_HOST)"
+schemes:
+  Pulse:
+    build:
+      targets:
+        Pulse: all
+        PulseTests: [test]
+    test:
+      targets: [PulseTests]

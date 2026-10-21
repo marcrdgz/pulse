@@ -1,13 +1,15 @@
 name: CI
-run-name: Checking code for type errors
-on: push
+
+on:
+  push:
+    branches: [main, webkit]
+  pull_request:
+
 jobs:
-  typecheck:
-    name: Check code types
-    runs-on: ubuntu-latest
+  test:
+    runs-on: macos-26
     steps:
       - uses: actions/checkout@v4
-      - uses: oven-sh/setup-bun@v2
-
-      - run: bun install
-      - run: bun typecheck
+      - run: brew install xcodegen
+      - run: xcodegen generate
+      - run: xcodebuild -project Pulse.xcodeproj -scheme Pulse -destination 'platform=macOS' -derivedDataPath build/DerivedData test -quiet
