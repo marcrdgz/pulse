@@ -16,6 +16,7 @@ struct SessionTests {
         browser.openTab(url: URL(string: "https://c.com")!)
         browser.togglePin(browser.todayTabs[2])
         browser.select(browser.todayTabs[1])
+        browser.rename(browser.todayTabs[0], to: "Renamed")
         browser.saveSession()
 
         let restored = Browser(sessionStore: store)
@@ -23,6 +24,7 @@ struct SessionTests {
         #expect(restored.activeTab?.url == URL(string: "https://b.com")!)
         #expect(restored.pinnedTabs.first?.pinnedURL == URL(string: "https://a.com")!)
         #expect(restored.commandBar == nil)
+        #expect(restored.todayTabs.first?.displayTitle == "Renamed")
 
         try FileManager.default.removeItem(at: store.fileURL.deletingLastPathComponent())
     }

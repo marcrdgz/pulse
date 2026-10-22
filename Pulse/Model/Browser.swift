@@ -3,6 +3,16 @@ import Observation
 import OSLog
 import WebKit
 
+enum TabSection: Hashable {
+    case pinned
+    case today
+}
+
+struct TabPosition: Hashable {
+    var section: TabSection
+    var index: Int
+}
+
 enum CommandBarMode: Hashable {
     case newTab
     case editActiveTab
@@ -133,15 +143,46 @@ final class Browser {
     }
 
     func togglePin(_ tab: Tab) {
-        if let index = pinnedTabs.firstIndex(where: { $0.id == tab.id }) {
-            pinnedTabs.remove(at: index)
-            tab.pinnedURL = nil
-            todayTabs.insert(tab, at: 0)
-        } else if let index = todayTabs.firstIndex(where: { $0.id == tab.id }) {
-            todayTabs.remove(at: index)
-            tab.pinnedURL = tab.url
-            pinnedTabs.append(tab)
+        if tab.isPinned {
+            moveTab(tab, to: TabPosition(section: .today, index: 0))
+        } else {
+            moveTab(tab, to: TabPosition(section: .pinned, index: pinnedTabs.count))
         }
+    }
+
+    func position(of tab: Tab) -> TabPosition? {
+        if let index = pinnedTabs.firstIndex(where: { $0.id == tab.id }) {
+            return TabPosition(section: .pinned, index: index)
+        }
+        if let index = todayTabs.firstIndex(where: { $0.id == tab.id }) {
+            return TabPosition(section: .today, index: index)
+        }
+        return nil
+    }
+
+    /// Reorders a tab, pinning or unpinning it when it crosses sections.
+    /// `destination.index` counts the section's tabs without the moved one.
+    func moveTab(_ tab: Tab, to destination: TabPosition) {
+        guard let source = position(of: tab) else { return }
+        switch source.section {
+        case .pinned: pinnedTabs.remove(at: source.index)
+        case .today: todayTabs.remove(at: source.index)
+        }
+        switch destination.section {
+        case .pinned:
+            tab.pinnedURL = tab.pinnedURL ?? tab.url
+            pinnedTabs.insert(tab, at: min(destination.index, pinnedTabs.count))
+        case .today:
+            tab.pinnedURL = nil
+            todayTabs.insert(tab, at: min(destination.index, todayTabs.count))
+        }
+        scheduleSave()
+    }
+
+    /// An empty title restores the page's own title.
+    func rename(_ tab: Tab, to title: String) {
+        let trimmed = title.trimmingCharacters(in: .whitespacesAndNewlines)
+        tab.customTitle = trimmed.isEmpty ? nil : trimmed
         scheduleSave()
     }
 
@@ -261,6 +302,7 @@ final class Browser {
 
     private func makeTab(_ saved: Session.SavedTab) -> Tab {
         let tab = Tab(id: saved.id, url: saved.url, title: saved.title, pinnedURL: saved.pinnedURL)
+        tab.customTitle = saved.customTitle
         tab.browser = self
         tab.loadFavicon()
         return tab
@@ -275,7 +317,7 @@ final class Browser {
 
 private extension Session.SavedTab {
     init(_ tab: Tab) {
-        self.init(id: tab.id, url: tab.url, title: tab.title, pinnedURL: tab.pinnedURL)
+        self.init(id: tab.id, url: tab.url, title: tab.title, customTitle: tab.customTitle, pinnedURL: tab.pinnedURL)
     }
 }
 

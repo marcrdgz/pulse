@@ -6,6 +6,7 @@ struct Session: Codable, Equatable {
         var id: UUID
         var url: URL
         var title: String
+        var customTitle: String?
         var pinnedURL: URL?
     }
 

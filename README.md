@@ -7,6 +7,8 @@ A native macOS browser built on WebKit, with Arc's look and keyboard-first workf
 - Sidebar with pinned tabs (favicon grid) and "Today" tabs, newest on top.
 - Command bar (⌘T / ⌘L): open a URL, search, or jump to an open tab.
 - Inset rounded web content, collapsible sidebar that peeks in from the left edge.
+- Drag tabs to reorder them, or between sections to pin and unpin; resize the sidebar by its edge.
+- Double-click a tab to rename it; middle-click to close it.
 - Session restore; tabs load lazily when first shown.
 - Find in page, downloads to ~/Downloads, and a native error page when a site can't load.
 

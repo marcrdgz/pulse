@@ -136,3 +136,67 @@ struct BrowserFindTests {
         #expect(!browser.isFindBarVisible)
     }
 }
+
+struct BrowserReorderTests {
+    private func makeBrowser() -> Browser {
+        let browser = Browser()
+        for page in ["a", "b", "c"] {
+            browser.openTab(url: URL(string: "https://\(page).com")!)
+        }
+        return browser
+    }
+
+    private func hosts(_ tabs: [Tab]) -> [String] {
+        tabs.map { $0.url.host()!.replacingOccurrences(of: ".com", with: "") }
+    }
+
+    @Test func reordersWithinSection() {
+        let browser = makeBrowser()
+        browser.moveTab(browser.todayTabs[0], to: TabPosition(section: .today, index: 2))
+        #expect(hosts(browser.todayTabs) == ["b", "a", "c"])
+    }
+
+    @Test func movingIntoPinnedPinsAtIndexAndKeepsSelection() {
+        let browser = makeBrowser()
+        browser.togglePin(browser.todayTabs[2])
+        let tab = browser.todayTabs[0]
+
+        browser.moveTab(tab, to: TabPosition(section: .pinned, index: 0))
+        #expect(hosts(browser.pinnedTabs) == ["c", "a"])
+        #expect(tab.pinnedURL == URL(string: "https://c.com")!)
+        #expect(browser.activeTab === tab)
+    }
+
+    @Test func movingOutOfPinnedUnpins() {
+        let browser = makeBrowser()
+        let tab = browser.todayTabs[1]
+        browser.togglePin(tab)
+
+        browser.moveTab(tab, to: TabPosition(section: .today, index: 1))
+        #expect(browser.pinnedTabs.isEmpty)
+        #expect(hosts(browser.todayTabs) == ["c", "b", "a"])
+        #expect(!tab.isPinned)
+    }
+
+    @Test func reorderingPinnedTabsKeepsTheirPinnedURL() {
+        let browser = makeBrowser()
+        let tab = browser.todayTabs[0]
+        browser.togglePin(tab)
+        browser.togglePin(browser.todayTabs[0])
+        tab.load(URL(string: "https://elsewhere.com")!)
+
+        browser.moveTab(tab, to: TabPosition(section: .pinned, index: 1))
+        #expect(browser.position(of: tab) == TabPosition(section: .pinned, index: 1))
+        #expect(tab.pinnedURL == URL(string: "https://c.com")!)
+    }
+
+    @Test func renamingOverridesTitleAndEmptyRestoresIt() {
+        let browser = makeBrowser()
+        let tab = browser.todayTabs[0]
+
+        browser.rename(tab, to: "  Docs  ")
+        #expect(tab.displayTitle == "Docs")
+        browser.rename(tab, to: "")
+        #expect(tab.displayTitle == "c.com")
+    }
+}

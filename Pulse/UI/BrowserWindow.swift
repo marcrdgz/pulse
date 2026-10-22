@@ -3,17 +3,23 @@ import SwiftUI
 
 struct BrowserWindow: View {
     @Environment(Browser.self) private var browser
+    @AppStorage("sidebarWidth") private var sidebarWidth = Theme.defaultSidebarWidth
     @State private var isPeekingSidebar = false
+    @State private var peekTask: Task<Void, Never>?
     @State private var tabCycleMonitor: Any?
 
     var body: some View {
         ZStack(alignment: .leading) {
             Theme.sidebarGradient
+                .overlay(WindowDragArea())
 
             HStack(spacing: 0) {
                 if browser.isSidebarVisible {
                     SidebarView()
-                        .frame(width: Theme.sidebarWidth)
+                        .frame(width: sidebarWidth)
+                        .overlay(alignment: .trailing) {
+                            SidebarResizeHandle(width: $sidebarWidth)
+                        }
                         .transition(.move(edge: .leading))
                 }
                 content
@@ -82,11 +88,19 @@ struct BrowserWindow: View {
         Color.clear
             .frame(width: Theme.contentInset)
             .contentShape(Rectangle())
-            .onHover { if $0 { isPeekingSidebar = true } }
+            .onHover { isHovering in
+                peekTask?.cancel()
+                guard isHovering else { return }
+                // A short delay so sweeping the pointer past the edge doesn't pop the sidebar open.
+                peekTask = Task {
+                    try? await Task.sleep(for: .milliseconds(150))
+                    if !Task.isCancelled { isPeekingSidebar = true }
+                }
+            }
 
         if isPeekingSidebar {
             SidebarView()
-                .frame(width: Theme.sidebarWidth)
+                .frame(width: sidebarWidth)
                 .background(Theme.sidebarGradient)
                 .clipShape(RoundedRectangle(cornerRadius: Theme.contentCornerRadius, style: .continuous))
                 .shadow(color: .black.opacity(0.25), radius: 12, x: 2)
@@ -163,10 +177,35 @@ private struct WindowChrome: NSViewRepresentable {
         DispatchQueue.main.async {
             guard let window = view.window else { return }
             window.titlebarAppearsTransparent = true
-            window.isMovableByWindowBackground = true
+            window.isMovableByWindowBackground = false
             for button in [NSWindow.ButtonType.closeButton, .miniaturizeButton, .zoomButton] {
                 window.standardWindowButton(button)?.isHidden = !showsTrafficLights
             }
         }
+    }
+}
+
+/// Drag the sidebar's trailing edge to resize it; the width is remembered across launches.
+private struct SidebarResizeHandle: View {
+    @Binding var width: Double
+    @State private var widthAtDragStart: Double?
+
+    var body: some View {
+        Color.clear
+            .frame(width: 8)
+            .contentShape(Rectangle())
+            .onHover { isHovering in
+                if isHovering { NSCursor.resizeLeftRight.push() } else { NSCursor.pop() }
+            }
+            .gesture(
+                DragGesture(minimumDistance: 0, coordinateSpace: .global)
+                    .onChanged { value in
+                        let start = widthAtDragStart ?? width
+                        widthAtDragStart = start
+                        let range = Theme.sidebarWidthRange
+                        width = min(max(start + value.translation.width, range.lowerBound), range.upperBound)
+                    }
+                    .onEnded { _ in widthAtDragStart = nil }
+            )
     }
 }

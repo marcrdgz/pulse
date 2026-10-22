@@ -15,6 +15,8 @@ final class Tab: Identifiable {
     private(set) var loadError: LoadError?
     /// The page a pinned tab returns to when closed; `nil` for today tabs.
     var pinnedURL: URL?
+    /// Set by the user from the sidebar; overrides the page title.
+    var customTitle: String?
 
     @ObservationIgnored weak var browser: Browser?
     @ObservationIgnored private var loadedWebView: WKWebView?
@@ -39,7 +41,7 @@ final class Tab: Identifiable {
     var isPinned: Bool { pinnedURL != nil }
 
     var displayTitle: String {
-        title.isEmpty ? (url.displayHost ?? "New Tab") : title
+        customTitle ?? (title.isEmpty ? (url.displayHost ?? "New Tab") : title)
     }
 
     /// Created on first access so restored and background tabs cost nothing until shown.

@@ -4,7 +4,7 @@
 
 - [ ] Spaces (multiple sidebars with their own colors and pinned tabs, ⌃1…⌃9).
 - [ ] Profiles (separate `WKWebsiteDataStore` per space).
-- [ ] Drag and drop to reorder and pin tabs.
+- [ ] Folders in the pinned section.
 - [ ] Downloads list (progress, reveal in Finder, cancel); today only a toast.
 - [ ] Preferences (search engine, sidebar color).
 - [ ] Little Arc (lightweight window for links opened from other apps).
