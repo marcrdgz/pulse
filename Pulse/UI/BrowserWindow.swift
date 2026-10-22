@@ -57,26 +57,11 @@ struct BrowserWindow: View {
     }
 
     private var content: some View {
-        Group {
-            if let tab = browser.activeTab {
-                WebView(tab: tab)
-                    .overlay {
-                        if let error = tab.loadError {
-                            LoadErrorView(tab: tab, error: error)
-                                .clipShape(RoundedRectangle(cornerRadius: Theme.contentCornerRadius, style: .continuous))
-                        }
-                    }
-                    .overlay(alignment: .topTrailing) {
-                        if browser.isFindBarVisible {
-                            FindBar()
-                                .padding(12)
-                                .transition(.move(edge: .top).combined(with: .opacity))
-                        }
-                    }
-            } else {
-                EmptyStateView()
-            }
+        VStack(spacing: 0) {
+            DefaultBrowserBanner()
+            page
         }
+        .clipShape(RoundedRectangle(cornerRadius: Theme.contentCornerRadius, style: .continuous))
         .background(
             RoundedRectangle(cornerRadius: Theme.contentCornerRadius, style: .continuous)
                 .fill(Color(nsColor: .windowBackgroundColor))
@@ -85,6 +70,34 @@ struct BrowserWindow: View {
         .padding(.vertical, Theme.contentInset)
         .padding(.trailing, Theme.contentInset)
         .padding(.leading, browser.isSidebarVisible ? 0 : Theme.contentInset)
+    }
+
+    @ViewBuilder private var page: some View {
+        if let tab = browser.activeTab {
+            WebView(tab: tab)
+                .overlay {
+                    if let error = tab.loadError {
+                        LoadErrorView(tab: tab, error: error)
+                    }
+                }
+                .overlay(alignment: .topTrailing) {
+                    if browser.isFindBarVisible {
+                        FindBar()
+                            .padding(12)
+                            .transition(.move(edge: .top).combined(with: .opacity))
+                    }
+                }
+                .overlay(alignment: .topLeading) {
+                    if let request = browser.activePermissionRequest {
+                        PermissionPrompt(request: request)
+                            .padding(12)
+                            .transition(.move(edge: .top).combined(with: .opacity))
+                    }
+                }
+                .animation(.snappy(duration: 0.2), value: browser.activePermissionRequest?.id)
+        } else {
+            EmptyStateView()
+        }
     }
 
     /// With the sidebar hidden, hovering the window's left edge slides it in over the page, like Arc.

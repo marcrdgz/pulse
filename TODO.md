@@ -2,6 +2,8 @@
 
 ## Feats
 
+- [ ] Geolocation permission (WKWebView has no public API for it on macOS).
+
 - [ ] Profiles (separate `WKWebsiteDataStore` per space).
 - [ ] Drag a tab onto a space dot to move it there.
 - [ ] Space icons (emoji) and reordering spaces.

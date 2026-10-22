@@ -37,10 +37,13 @@ final class Browser {
     private(set) var isFindQueryMissing = false
     /// The space whose name is being edited in the sidebar.
     private(set) var renamingSpaceID: Space.ID?
+    /// Sites waiting for a camera/microphone answer, oldest first.
+    private(set) var permissionRequests: [PermissionRequest] = []
     private var closedTabs: [ClosedTab] = []
 
     @ObservationIgnored let downloads = DownloadManager()
     @ObservationIgnored private let sessionStore: SessionStore?
+    @ObservationIgnored private let sitePermissions: SitePermissionStore?
     @ObservationIgnored private var saveTask: Task<Void, Never>?
     @ObservationIgnored private var toastTask: Task<Void, Never>?
 
@@ -51,11 +54,12 @@ final class Browser {
         let index: Int
     }
 
-    init(sessionStore: SessionStore? = nil) {
+    init(sessionStore: SessionStore? = nil, sitePermissions: SitePermissionStore? = nil) {
         let home = Space(name: "Home", theme: .purple)
         spaces = [home]
         activeSpaceID = home.id
         self.sessionStore = sessionStore
+        self.sitePermissions = sitePermissions
         downloads.browser = self
         if let session = sessionStore?.load() {
             restore(session)
@@ -106,6 +110,12 @@ final class Browser {
         return tab
     }
 
+    /// Links opened from other apps: a new foreground tab in the current space, like Chrome.
+    func openExternalURL(_ url: URL) {
+        commandBar = nil
+        openTab(url: url)
+    }
+
     /// Creates the tab WebKit needs for `window.open` / `target=_blank` and returns its web view.
     func openPopup(configuration: WKWebViewConfiguration) -> WKWebView {
         let tab = openTab(url: URL(string: "about:blank")!)
@@ -141,6 +151,7 @@ final class Browser {
 
     /// Favorites and pinned tabs are never removed: closing one resets it to its pinned page, like Arc.
     func close(_ tab: Tab) {
+        denyPermissionRequests(from: tab)
         if tab.isPinned {
             tab.resetToPinnedURL()
             if tab.id == activeTabID { select(todayTabs.first) }
@@ -160,6 +171,48 @@ final class Browser {
             commandBar = .newTab
         }
         scheduleSave()
+    }
+
+    // MARK: Permissions
+
+    /// The prompt to show: the oldest request from the visible tab.
+    var activePermissionRequest: PermissionRequest? {
+        permissionRequests.first { $0.tabID == activeTabID }
+    }
+
+    /// Answers at once when the user already decided for this site, otherwise queues a prompt.
+    func requestPermission(
+        from tab: Tab,
+        origin: String,
+        kinds: [PermissionKind],
+        respond: @escaping (WKPermissionDecision) -> Void
+    ) {
+        if let isAllowed = sitePermissions?.decision(for: origin, kinds: kinds) {
+            respond(isAllowed ? .grant : .deny)
+            return
+        }
+        permissionRequests.append(PermissionRequest(tabID: tab.id, origin: origin, kinds: kinds, respond: respond))
+    }
+
+    func answer(_ request: PermissionRequest, with choice: PermissionChoice) {
+        guard let index = permissionRequests.firstIndex(where: { $0.id == request.id }) else { return }
+        permissionRequests.remove(at: index)
+        switch choice {
+        case .allowAlways:
+            sitePermissions?.save(true, for: request.origin, kinds: request.kinds)
+            request.respond(.grant)
+        case .allowOnce:
+            request.respond(.grant)
+        case .neverAllow:
+            sitePermissions?.save(false, for: request.origin, kinds: request.kinds)
+            request.respond(.deny)
+        }
+    }
+
+    private func denyPermissionRequests(from tab: Tab) {
+        let pending = permissionRequests.filter { $0.tabID == tab.id }
+        permissionRequests.removeAll { $0.tabID == tab.id }
+        pending.forEach { $0.respond(.deny) }
     }
 
     func closeActiveTab() {

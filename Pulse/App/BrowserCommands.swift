@@ -7,6 +7,12 @@ struct BrowserCommands: Commands {
     private var activeTab: Tab? { browser.activeTab }
 
     var body: some Commands {
+        CommandGroup(after: .appInfo) {
+            Button("Make Pulse Your Default Browser…") {
+                Task { await DefaultBrowser.makeDefault() }
+            }
+        }
+
         CommandGroup(replacing: .newItem) {
             Button("New Tab") { browser.showCommandBar(.newTab) }
                 .keyboardShortcut("t")

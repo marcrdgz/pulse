@@ -87,6 +87,25 @@ final class WebViewCoordinator: NSObject, WKNavigationDelegate, WKUIDelegate {
         tab?.browser?.openPopup(configuration: configuration)
     }
 
+    func webView(
+        _ webView: WKWebView,
+        requestMediaCapturePermissionFor origin: WKSecurityOrigin,
+        initiatedByFrame frame: WKFrameInfo,
+        type: WKMediaCaptureType,
+        decisionHandler: @escaping @MainActor @Sendable (WKPermissionDecision) -> Void
+    ) {
+        guard let tab, let browser = tab.browser else {
+            decisionHandler(.deny)
+            return
+        }
+        browser.requestPermission(
+            from: tab,
+            origin: origin.displayName,
+            kinds: PermissionKind.kinds(for: type),
+            respond: decisionHandler
+        )
+    }
+
     func webViewDidClose(_ webView: WKWebView) {
         if let tab { tab.browser?.close(tab) }
     }
