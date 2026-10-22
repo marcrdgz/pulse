@@ -12,6 +12,7 @@ final class Tab: Identifiable {
     private(set) var estimatedProgress = 0.0
     private(set) var canGoBack = false
     private(set) var canGoForward = false
+    private(set) var loadError: LoadError?
     /// The page a pinned tab returns to when closed; `nil` for today tabs.
     var pinnedURL: URL?
 
@@ -19,6 +20,14 @@ final class Tab: Identifiable {
     @ObservationIgnored private var loadedWebView: WKWebView?
     @ObservationIgnored private var coordinator: WebViewCoordinator?
     @ObservationIgnored private var observations: [NSKeyValueObservation] = []
+
+    struct LoadError: Equatable {
+        let url: URL
+        let code: Int
+        let message: String
+
+        var isOffline: Bool { code == NSURLErrorNotConnectedToInternet }
+    }
 
     init(id: UUID = UUID(), url: URL, title: String = "", pinnedURL: URL? = nil) {
         self.id = id
@@ -48,6 +57,7 @@ final class Tab: Identifiable {
 
     func load(_ url: URL) {
         self.url = url
+        loadError = nil
         loadedWebView?.load(URLRequest(url: url))
         browser?.tabDidUpdate()
     }
@@ -57,7 +67,9 @@ final class Tab: Identifiable {
     func stopLoading() { loadedWebView?.stopLoading() }
 
     func reload(ignoringCache: Bool = false) {
-        if ignoringCache {
+        if let loadError {
+            load(loadError.url)
+        } else if ignoringCache {
             loadedWebView?.reloadFromOrigin()
         } else {
             loadedWebView?.reload()
@@ -67,6 +79,43 @@ final class Tab: Identifiable {
     func zoomIn() { setZoom((loadedWebView?.pageZoom ?? 1) + 0.1) }
     func zoomOut() { setZoom((loadedWebView?.pageZoom ?? 1) - 0.1) }
     func resetZoom() { setZoom(1) }
+
+    /// Highlights and scrolls to the next match; returns whether the page contains `query`.
+    func find(_ query: String, backwards: Bool) async -> Bool {
+        guard let loadedWebView else { return false }
+        let configuration = WKFindConfiguration()
+        configuration.backwards = backwards
+        return (try? await loadedWebView.find(query, configuration: configuration))?.matchFound ?? false
+    }
+
+    func clearFindSelection() {
+        loadedWebView?.evaluateJavaScript("window.getSelection().removeAllRanges()")
+    }
+
+    /// WebKit leaves `url` pointing at the file after a navigation becomes a download;
+    /// the page actually shown is the current history item.
+    func navigationDidBecomeDownload() {
+        guard let currentURL = loadedWebView?.backForwardList.currentItem?.url, currentURL != url else { return }
+        url = currentURL
+        browser?.tabDidUpdate()
+    }
+
+    func navigationDidStart() {
+        loadError = nil
+    }
+
+    func navigationDidFail(with error: Error) {
+        let error = error as NSError
+        // Cancelled loads and responses turned into downloads (WebKit 102) aren't page failures.
+        let isInterruption = (error.domain == NSURLErrorDomain && error.code == NSURLErrorCancelled)
+            || (error.domain == "WebKitErrorDomain" && error.code == 102)
+        guard !isInterruption else { return }
+        loadError = LoadError(
+            url: error.userInfo[NSURLErrorFailingURLErrorKey] as? URL ?? url,
+            code: error.code,
+            message: error.localizedDescription
+        )
+    }
 
     func showWebInspector() {
         // WebKit has no public API to open the inspector; `_inspector` is the SPI other WebKit shells use.
@@ -84,6 +133,7 @@ final class Tab: Identifiable {
         loadedWebView?.removeFromSuperview()
         loadedWebView = nil
         coordinator = nil
+        loadError = nil
         isLoading = false
         estimatedProgress = 0
         canGoBack = false

@@ -16,6 +16,10 @@ final class WebViewCoordinator: NSObject, WKNavigationDelegate, WKUIDelegate {
         decidePolicyFor navigationAction: WKNavigationAction,
         decisionHandler: @escaping @MainActor @Sendable (WKNavigationActionPolicy) -> Void
     ) {
+        if navigationAction.shouldPerformDownload {
+            decisionHandler(.download)
+            return
+        }
         // ⌘-click opens the link in a background tab, like Arc and Safari.
         if navigationAction.navigationType == .linkActivated,
            navigationAction.modifierFlags.contains(.command),
@@ -25,6 +29,43 @@ final class WebViewCoordinator: NSObject, WKNavigationDelegate, WKUIDelegate {
             return
         }
         decisionHandler(.allow)
+    }
+
+    func webView(
+        _ webView: WKWebView,
+        decidePolicyFor navigationResponse: WKNavigationResponse,
+        decisionHandler: @escaping @MainActor @Sendable (WKNavigationResponsePolicy) -> Void
+    ) {
+        guard navigationResponse.isForMainFrame else {
+            decisionHandler(.allow)
+            return
+        }
+        let isAttachment = (navigationResponse.response as? HTTPURLResponse)?
+            .value(forHTTPHeaderField: "Content-Disposition")?
+            .lowercased().hasPrefix("attachment") ?? false
+        decisionHandler(navigationResponse.canShowMIMEType && !isAttachment ? .allow : .download)
+    }
+
+    func webView(_ webView: WKWebView, navigationAction: WKNavigationAction, didBecome download: WKDownload) {
+        tab?.browser?.downloads.track(download)
+        tab?.navigationDidBecomeDownload()
+    }
+
+    func webView(_ webView: WKWebView, navigationResponse: WKNavigationResponse, didBecome download: WKDownload) {
+        tab?.browser?.downloads.track(download)
+        tab?.navigationDidBecomeDownload()
+    }
+
+    func webView(_ webView: WKWebView, didStartProvisionalNavigation navigation: WKNavigation!) {
+        tab?.navigationDidStart()
+    }
+
+    func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!, withError error: Error) {
+        tab?.navigationDidFail(with: error)
+    }
+
+    func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) {
+        tab?.navigationDidFail(with: error)
     }
 
     func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {

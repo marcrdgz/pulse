@@ -123,3 +123,16 @@ struct BrowserTests {
         #expect(hosts(browser.todayTabs) == ["c", "b"])
     }
 }
+
+struct BrowserFindTests {
+    @Test func findBarClosesWhenSwitchingTabs() {
+        let browser = Browser()
+        let first = browser.openTab(url: URL(string: "https://a.com")!)
+        browser.openTab(url: URL(string: "https://b.com")!)
+
+        browser.showFindBar()
+        #expect(browser.isFindBarVisible)
+        browser.select(first)
+        #expect(!browser.isFindBarVisible)
+    }
+}

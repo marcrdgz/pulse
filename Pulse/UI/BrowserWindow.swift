@@ -4,6 +4,7 @@ import SwiftUI
 struct BrowserWindow: View {
     @Environment(Browser.self) private var browser
     @State private var isPeekingSidebar = false
+    @State private var tabCycleMonitor: Any?
 
     var body: some View {
         ZStack(alignment: .leading) {
@@ -37,7 +38,9 @@ struct BrowserWindow: View {
         .animation(.snappy(duration: 0.2), value: isPeekingSidebar)
         .animation(.easeOut(duration: 0.15), value: browser.commandBar)
         .animation(.snappy, value: browser.toast)
+        .animation(.snappy(duration: 0.2), value: browser.isFindBarVisible)
         .onChange(of: browser.isSidebarVisible) { isPeekingSidebar = false }
+        .onAppear(perform: installTabCycleMonitor)
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.willTerminateNotification)) { _ in
             browser.saveSession()
         }
@@ -47,6 +50,19 @@ struct BrowserWindow: View {
         Group {
             if let tab = browser.activeTab {
                 WebView(tab: tab)
+                    .overlay {
+                        if let error = tab.loadError {
+                            LoadErrorView(tab: tab, error: error)
+                                .clipShape(RoundedRectangle(cornerRadius: Theme.contentCornerRadius, style: .continuous))
+                        }
+                    }
+                    .overlay(alignment: .topTrailing) {
+                        if browser.isFindBarVisible {
+                            FindBar()
+                                .padding(12)
+                                .transition(.move(edge: .top).combined(with: .opacity))
+                        }
+                    }
             } else {
                 EmptyStateView()
             }
@@ -77,6 +93,17 @@ struct BrowserWindow: View {
                 .padding(.vertical, Theme.contentInset)
                 .onHover { if !$0 { isPeekingSidebar = false } }
                 .transition(.move(edge: .leading).combined(with: .opacity))
+        }
+    }
+
+    /// ⌃⇥ never reaches the menu: the key view loop and WKWebView consume it first.
+    private func installTabCycleMonitor() {
+        guard tabCycleMonitor == nil else { return }
+        tabCycleMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { event in
+            let modifiers = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
+            guard event.keyCode == 48, modifiers.subtracting(.shift) == .control else { return event }
+            browser.selectAdjacentTab(offset: modifiers.contains(.shift) ? -1 : 1)
+            return nil
         }
     }
 

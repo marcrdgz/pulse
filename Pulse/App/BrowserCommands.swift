@@ -24,6 +24,19 @@ struct BrowserCommands: Commands {
         // The system "Close" item also binds ⌘W and would win over "Close Tab", closing the only window.
         CommandGroup(replacing: .saveItem) {}
 
+        CommandGroup(after: .textEditing) {
+            Divider()
+            Button("Find on Page…", action: browser.showFindBar)
+                .keyboardShortcut("f")
+                .disabled(activeTab == nil)
+            Button("Find Next") { browser.findInPage() }
+                .keyboardShortcut("g")
+                .disabled(!browser.isFindBarVisible)
+            Button("Find Previous") { browser.findInPage(backwards: true) }
+                .keyboardShortcut("g", modifiers: [.command, .shift])
+                .disabled(!browser.isFindBarVisible)
+        }
+
         CommandGroup(replacing: .sidebar) {
             Button(browser.isSidebarVisible ? "Hide Sidebar" : "Show Sidebar", action: browser.toggleSidebar)
                 .keyboardShortcut("s")

@@ -17,8 +17,14 @@ final class Browser {
     private(set) var commandBar: CommandBarMode?
     private(set) var toast: String?
     var isSidebarVisible = true
+    private(set) var isFindBarVisible = false
+    /// Bumped on every ⌘F so the find bar refocuses its field even when already open.
+    private(set) var findBarActivation = 0
+    var findQuery = ""
+    private(set) var isFindQueryMissing = false
     private var closedTabs: [ClosedTab] = []
 
+    @ObservationIgnored let downloads = DownloadManager()
     @ObservationIgnored private let sessionStore: SessionStore?
     @ObservationIgnored private var saveTask: Task<Void, Never>?
     @ObservationIgnored private var toastTask: Task<Void, Never>?
@@ -31,6 +37,7 @@ final class Browser {
 
     init(sessionStore: SessionStore? = nil) {
         self.sessionStore = sessionStore
+        downloads.browser = self
         if let session = sessionStore?.load() {
             restore(session)
         }
@@ -69,6 +76,7 @@ final class Browser {
     }
 
     func select(_ tab: Tab?) {
+        if tab?.id != activeTabID { isFindBarVisible = false }
         activeTabID = tab?.id
         scheduleSave()
     }
@@ -165,6 +173,32 @@ final class Browser {
     func switchTo(_ tab: Tab) {
         commandBar = nil
         select(tab)
+    }
+
+    // MARK: Find
+
+    func showFindBar() {
+        guard activeTab != nil else { return }
+        isFindBarVisible = true
+        findBarActivation += 1
+    }
+
+    func hideFindBar() {
+        isFindBarVisible = false
+        isFindQueryMissing = false
+        activeTab?.clearFindSelection()
+    }
+
+    func findInPage(backwards: Bool = false) {
+        guard let tab = activeTab, !findQuery.isEmpty else {
+            isFindQueryMissing = false
+            return
+        }
+        let query = findQuery
+        Task {
+            let found = await tab.find(query, backwards: backwards)
+            if query == findQuery { isFindQueryMissing = !found }
+        }
     }
 
     // MARK: Chrome

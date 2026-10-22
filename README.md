@@ -8,6 +8,7 @@ A native macOS browser built on WebKit, with Arc's look and keyboard-first workf
 - Command bar (⌘T / ⌘L): open a URL, search, or jump to an open tab.
 - Inset rounded web content, collapsible sidebar that peeks in from the left edge.
 - Session restore; tabs load lazily when first shown.
+- Find in page, downloads to ~/Downloads, and a native error page when a site can't load.
 
 ## Shortcuts
 
@@ -23,6 +24,7 @@ A native macOS browser built on WebKit, with Arc's look and keyboard-first workf
 | ⌘[ / ⌘] | Back / forward |
 | ⌘R / ⌘⇧R | Reload / reload ignoring cache |
 | ⌘⇧C | Copy URL |
+| ⌘F / ⌘G / ⌘⇧G | Find on page / next / previous match |
 | ⌘+ / ⌘- / ⌘0 | Zoom |
 | ⌘⌥I | Web Inspector |
 | ⌘-click | Open link in background tab |

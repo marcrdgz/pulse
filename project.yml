@@ -28,6 +28,7 @@ targets:
         ENABLE_APP_SANDBOX: YES
         ENABLE_OUTGOING_NETWORK_CONNECTIONS: YES
         ENABLE_USER_SELECTED_FILES: readwrite
+        ENABLE_FILE_ACCESS_DOWNLOADS_FOLDER: readwrite
   PulseTests:
     type: bundle.unit-test
     platform: macOS
