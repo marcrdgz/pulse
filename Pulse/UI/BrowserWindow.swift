@@ -6,12 +6,16 @@ struct BrowserWindow: View {
     @AppStorage("sidebarWidth") private var sidebarWidth = Theme.defaultSidebarWidth
     @State private var isPeekingSidebar = false
     @State private var peekTask: Task<Void, Never>?
-    @State private var tabCycleMonitor: Any?
+    @State private var controlShortcutMonitor: Any?
 
     var body: some View {
         ZStack(alignment: .leading) {
-            Theme.sidebarGradient
-                .overlay(WindowDragArea())
+            // Cross-fades between spaces' themes; gradients don't interpolate their colors.
+            Theme.sidebarGradient(browser.activeSpace.theme)
+                .id(browser.activeSpace.theme)
+                .transition(.opacity)
+                .animation(.easeInOut(duration: 0.35), value: browser.activeSpace.theme)
+            WindowDragArea()
 
             HStack(spacing: 0) {
                 if browser.isSidebarVisible {
@@ -46,7 +50,7 @@ struct BrowserWindow: View {
         .animation(.snappy, value: browser.toast)
         .animation(.snappy(duration: 0.2), value: browser.isFindBarVisible)
         .onChange(of: browser.isSidebarVisible) { isPeekingSidebar = false }
-        .onAppear(perform: installTabCycleMonitor)
+        .onAppear(perform: installControlShortcutMonitor)
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.willTerminateNotification)) { _ in
             browser.saveSession()
         }
@@ -101,7 +105,7 @@ struct BrowserWindow: View {
         if isPeekingSidebar {
             SidebarView()
                 .frame(width: sidebarWidth)
-                .background(Theme.sidebarGradient)
+                .background(Theme.sidebarGradient(browser.activeSpace.theme))
                 .clipShape(RoundedRectangle(cornerRadius: Theme.contentCornerRadius, style: .continuous))
                 .shadow(color: .black.opacity(0.25), radius: 12, x: 2)
                 .padding(.vertical, Theme.contentInset)
@@ -110,14 +114,20 @@ struct BrowserWindow: View {
         }
     }
 
-    /// ⌃⇥ never reaches the menu: the key view loop and WKWebView consume it first.
-    private func installTabCycleMonitor() {
-        guard tabCycleMonitor == nil else { return }
-        tabCycleMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { event in
+    /// ⌃⇥ and ⌃1…⌃9 never reach the menu: the key view loop and WKWebView consume them first.
+    private func installControlShortcutMonitor() {
+        guard controlShortcutMonitor == nil else { return }
+        controlShortcutMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { event in
             let modifiers = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
-            guard event.keyCode == 48, modifiers.subtracting(.shift) == .control else { return event }
-            browser.selectAdjacentTab(offset: modifiers.contains(.shift) ? -1 : 1)
-            return nil
+            if event.keyCode == 48, modifiers.subtracting(.shift) == .control {
+                browser.selectAdjacentTab(offset: modifiers.contains(.shift) ? -1 : 1)
+                return nil
+            }
+            if modifiers == .control, let number = event.charactersIgnoringModifiers.flatMap(Int.init), (1...9).contains(number) {
+                browser.selectSpace(number: number)
+                return nil
+            }
+            return event
         }
     }
 

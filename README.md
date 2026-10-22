@@ -4,10 +4,11 @@ A native macOS browser built on WebKit, with Arc's look and keyboard-first workf
 
 ## Features
 
-- Sidebar with pinned tabs (favicon grid) and "Today" tabs, newest on top.
+- Spaces: separate sidebars with their own color, pinned and "Today" tabs; Favorites (favicon grid) are shared.
+- Switch spaces with ⌃1…⌃9, ⌘⌥← / ⌘⌥→, the dots at the bottom of the sidebar, or a two-finger swipe.
 - Command bar (⌘T / ⌘L): open a URL, search, or jump to an open tab.
 - Inset rounded web content, collapsible sidebar that peeks in from the left edge.
-- Drag tabs to reorder them, or between sections to pin and unpin; resize the sidebar by its edge.
+- Drag tabs to reorder them, or between Favorites, Pinned and Today; resize the sidebar by its edge.
 - Double-click a tab to rename it; middle-click to close it.
 - Session restore; tabs load lazily when first shown.
 - Find in page, downloads to ~/Downloads, and a native error page when a site can't load.
@@ -19,7 +20,9 @@ A native macOS browser built on WebKit, with Arc's look and keyboard-first workf
 | ⌘T | New tab (command bar) |
 | ⌘L | Edit current URL |
 | ⌘W / ⌘⇧T | Close tab (resets pinned tabs) / reopen closed tab |
-| ⌘D | Pin / unpin tab |
+| ⌘D | Pin / unpin tab in the current space |
+| ⌃1…⌃9 | Switch to space N |
+| ⌘⌥← / ⌘⌥→ | Previous / next space |
 | ⌘S | Toggle sidebar |
 | ⌘1…⌘8, ⌘9 | Select tab N / last tab |
 | ⌘⌥↓ ⌘⌥↑, ⌃⇥ ⌃⇧⇥ | Next / previous tab |

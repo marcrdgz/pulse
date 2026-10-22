@@ -1,51 +1,48 @@
 import SwiftUI
 
-/// Pinned tabs as a grid of favicon tiles at the top of the sidebar.
-/// While a today tab is dragged it doubles as the drop zone for pinning.
-struct PinnedTabsGrid: View {
+/// Favorites, shared by every space, as a grid of favicon tiles at the top of the sidebar.
+/// While a tab is dragged it doubles as the drop zone for adding favorites.
+struct FavoritesGrid: View {
     @Environment(Browser.self) private var browser
     @Environment(SidebarDragController.self) private var dragController
 
-    private var isDropTarget: Bool { dragController.pendingSection == .pinned }
+    private var isDropTarget: Bool { dragController.pendingSection == .favorites }
 
     var body: some View {
         Group {
-            if browser.pinnedTabs.isEmpty {
-                Text("Drop here to pin")
-                    .font(.system(size: 12))
-                    .opacity(0.6)
-                    .frame(maxWidth: .infinity, minHeight: 44)
+            if browser.favorites.isEmpty {
+                SidebarDropZone(title: "Drop here to add to Favorites", isTargeted: isDropTarget)
             } else {
                 LazyVGrid(columns: [GridItem(.adaptive(minimum: 48), spacing: 6)], spacing: 6) {
-                    ForEach(browser.pinnedTabs) { tab in
-                        PinnedTabTile(tab: tab, isActive: tab.id == browser.activeTabID)
+                    ForEach(browser.favorites) { tab in
+                        FavoriteTile(tab: tab, isActive: tab.id == browser.activeTabID)
                             .onTapGesture { browser.select(tab) }
                             .contextMenu { TabContextMenu(tab: tab) }
                             .sidebarDraggable(tab)
                             .transition(.scale(scale: 0.8).combined(with: .opacity))
                     }
                 }
+                .background(
+                    RoundedRectangle(cornerRadius: 10, style: .continuous)
+                        .fill(isDropTarget ? Theme.hoverFill : .clear)
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: 10, style: .continuous)
+                        .strokeBorder(style: StrokeStyle(lineWidth: 1.5, dash: [5, 4]))
+                        .opacity(isDropTarget ? 0.45 : 0)
+                )
             }
         }
-        .background(
-            RoundedRectangle(cornerRadius: 10, style: .continuous)
-                .fill(isDropTarget ? Theme.hoverFill : .clear)
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: 10, style: .continuous)
-                .strokeBorder(style: StrokeStyle(lineWidth: 1.5, dash: [5, 4]))
-                .opacity(isDropTarget || browser.pinnedTabs.isEmpty ? 0.45 : 0)
-        )
         .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { frame in
-            dragController.pinnedAreaFrame = frame
+            dragController.favoritesAreaFrame = frame
         }
-        .onDisappear { dragController.pinnedAreaFrame = nil }
-        .animation(.snappy(duration: 0.22), value: browser.pinnedTabs.map(\.id))
+        .onDisappear { dragController.favoritesAreaFrame = nil }
+        .animation(.snappy(duration: 0.22), value: browser.favorites.map(\.id))
         .animation(.snappy(duration: 0.15), value: isDropTarget)
     }
 }
 
-private struct PinnedTabTile: View {
+private struct FavoriteTile: View {
     let tab: Tab
     let isActive: Bool
     @State private var isHovered = false
@@ -63,4 +60,3 @@ private struct PinnedTabTile: View {
             .help(tab.displayTitle)
     }
 }
-

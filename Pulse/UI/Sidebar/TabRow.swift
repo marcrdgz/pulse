@@ -3,14 +3,14 @@ import SwiftUI
 struct TabRow: View {
     @Environment(Browser.self) private var browser
     let tab: Tab
-    /// Shared by all rows so the active highlight slides between them.
+    /// The space's own active tab, so inactive spaces keep their highlight while sliding by.
+    let isActive: Bool
+    /// Shared by a space's rows so the active highlight slides between them.
     let highlightNamespace: Namespace.ID
     @State private var isHovered = false
     @State private var isRenaming = false
     @State private var draftTitle = ""
     @FocusState private var isTitleFieldFocused: Bool
-
-    private var isActive: Bool { tab.id == browser.activeTabID }
 
     var body: some View {
         HStack(spacing: 8) {
@@ -82,7 +82,17 @@ struct TabContextMenu: View {
     var onRename: (() -> Void)?
 
     var body: some View {
-        Button(tab.isPinned ? "Unpin Tab" : "Pin Tab") { browser.togglePin(tab) }
+        let section = browser.position(of: tab)?.section
+        Button(section == .favorites ? "Remove from Favorites" : "Add to Favorites") { browser.toggleFavorite(tab) }
+        Button(section == .pinned ? "Unpin Tab" : "Pin Tab") { browser.togglePin(tab) }
+        let otherSpaces = browser.spaces.filter { !$0.contains(tab) }
+        if section != .favorites, !otherSpaces.isEmpty {
+            Menu("Move to Space") {
+                ForEach(otherSpaces) { space in
+                    Button(space.name) { browser.moveTab(tab, to: space) }
+                }
+            }
+        }
         if let onRename {
             Button("Rename Tab…", action: onRename)
         }

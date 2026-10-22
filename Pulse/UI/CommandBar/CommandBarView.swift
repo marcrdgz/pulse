@@ -43,7 +43,7 @@ struct CommandBarView: View {
     }
 
     private var suggestions: [CommandBarSuggestion] {
-        CommandBarSuggestion.suggestions(for: query, openTabs: browser.allTabs)
+        CommandBarSuggestion.suggestions(for: query, openTabs: browser.everyTab)
     }
 
     var body: some View {

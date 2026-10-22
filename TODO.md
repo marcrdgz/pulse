@@ -2,8 +2,9 @@
 
 ## Feats
 
-- [ ] Spaces (multiple sidebars with their own colors and pinned tabs, ⌃1…⌃9).
 - [ ] Profiles (separate `WKWebsiteDataStore` per space).
+- [ ] Drag a tab onto a space dot to move it there.
+- [ ] Space icons (emoji) and reordering spaces.
 - [ ] Folders in the pinned section.
 - [ ] Downloads list (progress, reveal in Finder, cancel); today only a toast.
 - [ ] Preferences (search engine, sidebar color).

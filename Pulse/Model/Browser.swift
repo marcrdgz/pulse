@@ -4,10 +4,12 @@ import OSLog
 import WebKit
 
 enum TabSection: Hashable {
+    case favorites
     case pinned
     case today
 }
 
+/// A slot in the favorites or in one of the active space's sections.
 struct TabPosition: Hashable {
     var section: TabSection
     var index: Int
@@ -20,10 +22,11 @@ enum CommandBarMode: Hashable {
 
 @Observable
 final class Browser {
-    private(set) var pinnedTabs: [Tab] = []
-    /// Newest first, like Arc's "Today" section.
-    private(set) var todayTabs: [Tab] = []
-    private(set) var activeTabID: Tab.ID?
+    /// Shared by every space, shown as the favicon grid.
+    private(set) var favorites: [Tab] = []
+    /// Never empty.
+    private(set) var spaces: [Space]
+    private(set) var activeSpaceID: Space.ID
     private(set) var commandBar: CommandBarMode?
     private(set) var toast: String?
     var isSidebarVisible = true
@@ -32,6 +35,8 @@ final class Browser {
     private(set) var findBarActivation = 0
     var findQuery = ""
     private(set) var isFindQueryMissing = false
+    /// The space whose name is being edited in the sidebar.
+    private(set) var renamingSpaceID: Space.ID?
     private var closedTabs: [ClosedTab] = []
 
     @ObservationIgnored let downloads = DownloadManager()
@@ -42,10 +47,14 @@ final class Browser {
     private struct ClosedTab {
         let url: URL
         let title: String
+        let spaceID: Space.ID
         let index: Int
     }
 
     init(sessionStore: SessionStore? = nil) {
+        let home = Space(name: "Home", theme: .purple)
+        spaces = [home]
+        activeSpaceID = home.id
         self.sessionStore = sessionStore
         downloads.browser = self
         if let session = sessionStore?.load() {
@@ -56,8 +65,22 @@ final class Browser {
         }
     }
 
-    /// Pinned tabs first, then today tabs: the order ⌘1…⌘9 and tab cycling follow.
-    var allTabs: [Tab] { pinnedTabs + todayTabs }
+    var activeSpace: Space {
+        spaces.first { $0.id == activeSpaceID } ?? spaces[0]
+    }
+
+    var pinnedTabs: [Tab] { activeSpace.pinnedTabs }
+    var todayTabs: [Tab] { activeSpace.todayTabs }
+
+    /// Favorites, then the active space's pinned and today tabs: the order ⌘1…⌘9 and tab cycling follow.
+    var allTabs: [Tab] { favorites + activeSpace.tabs }
+
+    /// Every open tab, the active space's first; what the command bar searches.
+    var everyTab: [Tab] {
+        allTabs + spaces.filter { $0.id != activeSpaceID }.flatMap(\.tabs)
+    }
+
+    var activeTabID: Tab.ID? { activeSpace.activeTabID }
 
     var activeTab: Tab? {
         allTabs.first { $0.id == activeTabID }
@@ -65,12 +88,16 @@ final class Browser {
 
     var canReopenClosedTab: Bool { !closedTabs.isEmpty }
 
+    func space(containing tab: Tab) -> Space? {
+        spaces.first { $0.contains(tab) }
+    }
+
     // MARK: Tabs
 
     @discardableResult
     func openTab(url: URL, activate: Bool = true) -> Tab {
         let tab = makeTab(url: url)
-        todayTabs.insert(tab, at: 0)
+        activeSpace.todayTabs.insert(tab, at: 0)
         if activate {
             select(tab)
         } else {
@@ -85,9 +112,13 @@ final class Browser {
         return tab.adoptWebView(configuration: configuration)
     }
 
+    /// Selecting a tab from another space switches to that space.
     func select(_ tab: Tab?) {
+        if let tab, let owner = space(containing: tab), owner.id != activeSpaceID {
+            activeSpaceID = owner.id
+        }
         if tab?.id != activeTabID { isFindBarVisible = false }
-        activeTabID = tab?.id
+        activeSpace.activeTabID = tab?.id
         scheduleSave()
     }
 
@@ -108,19 +139,20 @@ final class Browser {
         select(tabs[(current + offset % tabs.count + tabs.count) % tabs.count])
     }
 
-    /// Pinned tabs are never removed: closing one resets it to its pinned page, like Arc.
+    /// Favorites and pinned tabs are never removed: closing one resets it to its pinned page, like Arc.
     func close(_ tab: Tab) {
-        let wasActive = tab.id == activeTabID
-
         if tab.isPinned {
             tab.resetToPinnedURL()
-            if wasActive { select(todayTabs.first) }
-        } else if let index = todayTabs.firstIndex(where: { $0.id == tab.id }) {
-            todayTabs.remove(at: index)
+            if tab.id == activeTabID { select(todayTabs.first) }
+        } else if let space = space(containing: tab),
+                  let index = space.todayTabs.firstIndex(where: { $0.id == tab.id }) {
+            space.todayTabs.remove(at: index)
             tab.unload()
-            closedTabs.append(ClosedTab(url: tab.url, title: tab.title, index: index))
-            if wasActive {
-                select(todayTabs.indices.contains(index) ? todayTabs[index] : todayTabs.last)
+            closedTabs.append(ClosedTab(url: tab.url, title: tab.title, spaceID: space.id, index: index))
+            if space.activeTabID == tab.id {
+                if space.id == activeSpaceID { isFindBarVisible = false }
+                let neighbor = space.todayTabs.indices.contains(index) ? space.todayTabs[index] : space.todayTabs.last
+                space.activeTabID = neighbor?.id
             }
         }
 
@@ -134,55 +166,155 @@ final class Browser {
         if let activeTab { close(activeTab) }
     }
 
+    /// Reopens into the space the tab was closed from, if it still exists.
     func reopenClosedTab() {
         guard let closed = closedTabs.popLast() else { return }
+        let space = spaces.first { $0.id == closed.spaceID } ?? activeSpace
         let tab = makeTab(url: closed.url, title: closed.title)
-        todayTabs.insert(tab, at: min(closed.index, todayTabs.count))
+        space.todayTabs.insert(tab, at: min(closed.index, space.todayTabs.count))
         commandBar = nil
         select(tab)
     }
 
+    /// Pins to, or unpins from, the active space's pinned list.
     func togglePin(_ tab: Tab) {
-        if tab.isPinned {
+        if position(of: tab)?.section == .pinned {
             moveTab(tab, to: TabPosition(section: .today, index: 0))
         } else {
             moveTab(tab, to: TabPosition(section: .pinned, index: pinnedTabs.count))
         }
     }
 
-    func position(of tab: Tab) -> TabPosition? {
-        if let index = pinnedTabs.firstIndex(where: { $0.id == tab.id }) {
-            return TabPosition(section: .pinned, index: index)
+    func toggleFavorite(_ tab: Tab) {
+        if position(of: tab)?.section == .favorites {
+            moveTab(tab, to: TabPosition(section: .today, index: 0))
+        } else {
+            moveTab(tab, to: TabPosition(section: .favorites, index: favorites.count))
         }
-        if let index = todayTabs.firstIndex(where: { $0.id == tab.id }) {
-            return TabPosition(section: .today, index: index)
-        }
-        return nil
     }
 
-    /// Reorders a tab, pinning or unpinning it when it crosses sections.
-    /// `destination.index` counts the section's tabs without the moved one.
-    func moveTab(_ tab: Tab, to destination: TabPosition) {
-        guard let source = position(of: tab) else { return }
-        switch source.section {
-        case .pinned: pinnedTabs.remove(at: source.index)
-        case .today: todayTabs.remove(at: source.index)
+    /// Where the tab sits: in the favorites, or in the space that owns it.
+    func position(of tab: Tab) -> TabPosition? {
+        if let index = favorites.firstIndex(where: { $0.id == tab.id }) {
+            return TabPosition(section: .favorites, index: index)
         }
+        guard let space = space(containing: tab) else { return nil }
+        if let index = space.pinnedTabs.firstIndex(where: { $0.id == tab.id }) {
+            return TabPosition(section: .pinned, index: index)
+        }
+        return space.todayTabs.firstIndex { $0.id == tab.id }.map { TabPosition(section: .today, index: $0) }
+    }
+
+    /// Moves a tab into the favorites or a section of the active space, pinning or unpinning it
+    /// as needed. `destination.index` counts the section's tabs without the moved one.
+    func moveTab(_ tab: Tab, to destination: TabPosition) {
+        guard detach(tab) else { return }
         switch destination.section {
+        case .favorites:
+            tab.pinnedURL = tab.pinnedURL ?? tab.url
+            favorites.insert(tab, at: min(destination.index, favorites.count))
         case .pinned:
             tab.pinnedURL = tab.pinnedURL ?? tab.url
-            pinnedTabs.insert(tab, at: min(destination.index, pinnedTabs.count))
+            activeSpace.pinnedTabs.insert(tab, at: min(destination.index, activeSpace.pinnedTabs.count))
         case .today:
             tab.pinnedURL = nil
-            todayTabs.insert(tab, at: min(destination.index, todayTabs.count))
+            activeSpace.todayTabs.insert(tab, at: min(destination.index, activeSpace.todayTabs.count))
         }
         scheduleSave()
+    }
+
+    /// Moves a tab to the top of another space's today tabs and follows it there.
+    func moveTab(_ tab: Tab, to space: Space) {
+        guard detach(tab) else { return }
+        tab.pinnedURL = nil
+        space.todayTabs.insert(tab, at: 0)
+        select(tab)
     }
 
     /// An empty title restores the page's own title.
     func rename(_ tab: Tab, to title: String) {
         let trimmed = title.trimmingCharacters(in: .whitespacesAndNewlines)
         tab.customTitle = trimmed.isEmpty ? nil : trimmed
+        scheduleSave()
+    }
+
+    private func detach(_ tab: Tab) -> Bool {
+        if let index = favorites.firstIndex(where: { $0.id == tab.id }) {
+            favorites.remove(at: index)
+            return true
+        }
+        guard let space = space(containing: tab) else { return false }
+        space.pinnedTabs.removeAll { $0.id == tab.id }
+        space.todayTabs.removeAll { $0.id == tab.id }
+        return true
+    }
+
+    // MARK: Spaces
+
+    var activeSpaceIndex: Int {
+        spaces.firstIndex { $0.id == activeSpaceID } ?? 0
+    }
+
+    @discardableResult
+    func createSpace() -> Space {
+        let theme = SpaceTheme.allCases[spaces.count % SpaceTheme.allCases.count]
+        let space = Space(name: "Space \(spaces.count + 1)", theme: theme)
+        spaces.append(space)
+        selectSpace(space)
+        commandBar = .newTab
+        return space
+    }
+
+    func selectSpace(_ space: Space) {
+        guard space.id != activeSpaceID, spaces.contains(where: { $0.id == space.id }) else { return }
+        activeSpaceID = space.id
+        isFindBarVisible = false
+        commandBar = nil
+        scheduleSave()
+    }
+
+    func selectSpace(number: Int) {
+        guard spaces.indices.contains(number - 1) else { return }
+        selectSpace(spaces[number - 1])
+    }
+
+    /// Doesn't wrap around, like swiping between Arc spaces.
+    func selectAdjacentSpace(offset: Int) {
+        let index = activeSpaceIndex + offset
+        guard spaces.indices.contains(index) else { return }
+        selectSpace(spaces[index])
+    }
+
+    func rename(_ space: Space, to name: String) {
+        let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return }
+        space.name = trimmed
+        scheduleSave()
+    }
+
+    func beginRenaming(_ space: Space) {
+        selectSpace(space)
+        renamingSpaceID = space.id
+    }
+
+    func endRenaming() {
+        renamingSpaceID = nil
+    }
+
+    func setTheme(_ theme: SpaceTheme, for space: Space) {
+        space.theme = theme
+        scheduleSave()
+    }
+
+    /// Closes the space's pinned and today tabs; favorites stay. The last space can't be deleted.
+    func delete(_ space: Space) {
+        guard spaces.count > 1, let index = spaces.firstIndex(where: { $0.id == space.id }) else { return }
+        space.tabs.forEach { $0.unload() }
+        spaces.remove(at: index)
+        if activeSpaceID == space.id {
+            activeSpaceID = spaces[min(index, spaces.count - 1)].id
+            isFindBarVisible = false
+        }
         scheduleSave()
     }
 
@@ -262,9 +394,18 @@ final class Browser {
 
     var session: Session {
         Session(
-            pinnedTabs: pinnedTabs.map(Session.SavedTab.init),
-            todayTabs: todayTabs.map(Session.SavedTab.init),
-            activeTabID: activeTabID
+            favorites: favorites.map(Session.SavedTab.init),
+            spaces: spaces.map { space in
+                Session.SavedSpace(
+                    id: space.id,
+                    name: space.name,
+                    theme: space.theme.rawValue,
+                    pinnedTabs: space.pinnedTabs.map(Session.SavedTab.init),
+                    todayTabs: space.todayTabs.map(Session.SavedTab.init),
+                    activeTabID: space.activeTabID
+                )
+            },
+            activeSpaceID: activeSpaceID
         )
     }
 
@@ -293,11 +434,28 @@ final class Browser {
     }
 
     private func restore(_ session: Session) {
-        pinnedTabs = session.pinnedTabs.map(makeTab)
-        todayTabs = session.todayTabs.map(makeTab)
-        activeTabID = allTabs.contains { $0.id == session.activeTabID }
-            ? session.activeTabID
-            : (todayTabs.first ?? pinnedTabs.first)?.id
+        favorites = session.favorites.map(makeTab)
+        let restoredSpaces = session.spaces.map { saved in
+            Space(
+                id: saved.id,
+                name: saved.name,
+                theme: SpaceTheme(rawValue: saved.theme) ?? .purple,
+                pinnedTabs: saved.pinnedTabs.map(makeTab),
+                todayTabs: saved.todayTabs.map(makeTab),
+                activeTabID: saved.activeTabID
+            )
+        }
+        guard let firstSpace = restoredSpaces.first else { return }
+        spaces = restoredSpaces
+        activeSpaceID = restoredSpaces.first { $0.id == session.activeSpaceID }?.id ?? firstSpace.id
+
+        // A saved active tab that no longer exists falls back to the space's first tab.
+        for space in spaces where space.activeTabID != nil {
+            let tabs = favorites + space.tabs
+            if !tabs.contains(where: { $0.id == space.activeTabID }) {
+                space.activeTabID = (space.todayTabs.first ?? space.pinnedTabs.first ?? favorites.first)?.id
+            }
+        }
     }
 
     private func makeTab(_ saved: Session.SavedTab) -> Tab {

@@ -69,7 +69,7 @@ struct BrowserCommands: Commands {
         }
 
         CommandMenu("Tabs") {
-            Button(activeTab?.isPinned == true ? "Unpin Tab" : "Pin Tab") {
+            Button(activeTab.flatMap(browser.position(of:))?.section == .pinned ? "Unpin Tab" : "Pin Tab") {
                 if let activeTab { browser.togglePin(activeTab) }
             }
             .keyboardShortcut("d")
@@ -96,6 +96,20 @@ struct BrowserCommands: Commands {
                     browser.selectTab(number: number)
                 }
                 .keyboardShortcut(KeyEquivalent(Character(String(number))))
+            }
+        }
+
+        CommandMenu("Spaces") {
+            Button("New Space") { browser.createSpace() }
+            Divider()
+            Button("Next Space") { browser.selectAdjacentSpace(offset: 1) }
+                .keyboardShortcut(.rightArrow, modifiers: [.command, .option])
+            Button("Previous Space") { browser.selectAdjacentSpace(offset: -1) }
+                .keyboardShortcut(.leftArrow, modifiers: [.command, .option])
+            Divider()
+            ForEach(Array(browser.spaces.prefix(9).enumerated()), id: \.element.id) { index, space in
+                Button(space.name) { browser.selectSpace(space) }
+                    .keyboardShortcut(KeyEquivalent(Character(String(index + 1))), modifiers: .control)
             }
         }
 

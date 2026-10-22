@@ -31,9 +31,55 @@ struct SessionTests {
 
     @Test func fallsBackToFirstTabWhenActiveTabIsMissing() throws {
         let tab = Session.SavedTab(id: UUID(), url: URL(string: "https://a.com")!, title: "A")
-        try store.save(Session(pinnedTabs: [], todayTabs: [tab], activeTabID: UUID()))
+        let space = Session.SavedSpace(
+            id: UUID(), name: "Work", theme: "blue", pinnedTabs: [], todayTabs: [tab], activeTabID: UUID()
+        )
+        try store.save(Session(favorites: [], spaces: [space], activeSpaceID: space.id))
 
         #expect(Browser(sessionStore: store).activeTabID == tab.id)
+
+        try FileManager.default.removeItem(at: store.fileURL.deletingLastPathComponent())
+    }
+
+    @Test func restoresSpacesThemesAndPerSpaceSelection() throws {
+        let browser = Browser(sessionStore: store)
+        browser.openTab(url: URL(string: "https://a.com")!)
+        browser.toggleFavorite(browser.todayTabs[0])
+        let work = browser.createSpace()
+        browser.rename(work, to: "Work")
+        browser.setTheme(.green, for: work)
+        browser.openTab(url: URL(string: "https://b.com")!)
+        browser.saveSession()
+
+        let restored = Browser(sessionStore: store)
+        #expect(restored.session == browser.session)
+        #expect(restored.spaces.map(\.name) == ["Home", "Work"])
+        #expect(restored.activeSpace.theme == .green)
+        #expect(restored.activeTab?.url == URL(string: "https://b.com")!)
+        #expect(restored.favorites.map(\.url) == [URL(string: "https://a.com")!])
+
+        try FileManager.default.removeItem(at: store.fileURL.deletingLastPathComponent())
+    }
+
+    /// Sessions saved before spaces: pinned tabs become favorites, the rest a single "Home" space.
+    @Test func migratesSessionsFromBeforeSpaces() throws {
+        let legacy = """
+            {"pinnedTabs":[{"id":"11111111-1111-1111-1111-111111111111","url":"https://github.com",\
+            "title":"GitHub","pinnedURL":"https://github.com"}],\
+            "todayTabs":[{"id":"33333333-3333-3333-3333-333333333333","url":"https://swift.org","title":"Swift"}],\
+            "activeTabID":"33333333-3333-3333-3333-333333333333"}
+            """
+        try FileManager.default.createDirectory(
+            at: store.fileURL.deletingLastPathComponent(), withIntermediateDirectories: true
+        )
+        try Data(legacy.utf8).write(to: store.fileURL)
+
+        let browser = Browser(sessionStore: store)
+        #expect(browser.favorites.map(\.url.host) == ["github.com"])
+        #expect(browser.favorites.first?.isPinned == true)
+        #expect(browser.spaces.map(\.name) == ["Home"])
+        #expect(browser.todayTabs.map(\.url.host) == ["swift.org"])
+        #expect(browser.activeTab?.url.host == "swift.org")
 
         try FileManager.default.removeItem(at: store.fileURL.deletingLastPathComponent())
     }
