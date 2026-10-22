@@ -51,6 +51,10 @@ struct BrowserWindow: View {
         .animation(.snappy(duration: 0.2), value: browser.isFindBarVisible)
         .onChange(of: browser.isSidebarVisible) { isPeekingSidebar = false }
         .onAppear(perform: installControlShortcutMonitor)
+        .sheet(isPresented: Bindable(browser).isClearBrowsingDataPresented) {
+            ClearBrowsingDataView()
+                .environment(browser)
+        }
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.willTerminateNotification)) { _ in
             browser.saveSession()
         }
@@ -73,7 +77,10 @@ struct BrowserWindow: View {
     }
 
     @ViewBuilder private var page: some View {
-        if let tab = browser.activeTab {
+        if let tab = browser.activeTab, tab.internalPage == .history {
+            HistoryPage(tab: tab)
+                .id(tab.id)
+        } else if let tab = browser.activeTab {
             WebView(tab: tab)
                 .overlay {
                     if let error = tab.loadError {

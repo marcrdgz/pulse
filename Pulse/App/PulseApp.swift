@@ -4,6 +4,7 @@ import SwiftUI
 struct PulseApp: App {
     @State private var browser = Browser(
         sessionStore: .standard,
+        history: .standard(),
         sitePermissions: SitePermissionStore(defaults: .standard)
     )
 

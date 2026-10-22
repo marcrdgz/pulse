@@ -108,7 +108,11 @@ struct FaviconView: View {
 
     var body: some View {
         Group {
-            if let favicon = tab.favicon {
+            if let page = tab.internalPage {
+                Image(systemName: page.symbol)
+                    .resizable()
+                    .scaledToFit()
+            } else if let favicon = tab.favicon {
                 Image(nsImage: favicon)
                     .resizable()
                     .interpolation(.high)

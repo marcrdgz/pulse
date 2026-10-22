@@ -37,28 +37,36 @@ final class Browser {
     private(set) var isFindQueryMissing = false
     /// The space whose name is being edited in the sidebar.
     private(set) var renamingSpaceID: Space.ID?
+    var isClearBrowsingDataPresented = false
     /// Sites waiting for a camera/microphone answer, oldest first.
     private(set) var permissionRequests: [PermissionRequest] = []
     private var closedTabs: [ClosedTab] = []
 
     @ObservationIgnored let downloads = DownloadManager()
+    @ObservationIgnored let history: HistoryStore?
     @ObservationIgnored private let sessionStore: SessionStore?
     @ObservationIgnored private let sitePermissions: SitePermissionStore?
     @ObservationIgnored private var saveTask: Task<Void, Never>?
     @ObservationIgnored private var toastTask: Task<Void, Never>?
 
-    private struct ClosedTab {
+    struct ClosedTab: Identifiable {
+        let id = UUID()
         let url: URL
         let title: String
         let spaceID: Space.ID
         let index: Int
     }
 
-    init(sessionStore: SessionStore? = nil, sitePermissions: SitePermissionStore? = nil) {
+    init(
+        sessionStore: SessionStore? = nil,
+        history: HistoryStore? = nil,
+        sitePermissions: SitePermissionStore? = nil
+    ) {
         let home = Space(name: "Home", theme: .purple)
         spaces = [home]
         activeSpaceID = home.id
         self.sessionStore = sessionStore
+        self.history = history
         self.sitePermissions = sitePermissions
         downloads.browser = self
         if let session = sessionStore?.load() {
@@ -91,6 +99,9 @@ final class Browser {
     }
 
     var canReopenClosedTab: Bool { !closedTabs.isEmpty }
+
+    /// Most recently closed first, for the History menu.
+    var recentlyClosedTabs: [ClosedTab] { Array(closedTabs.reversed().prefix(10)) }
 
     func space(containing tab: Tab) -> Space? {
         spaces.first { $0.contains(tab) }
@@ -173,6 +184,41 @@ final class Browser {
         scheduleSave()
     }
 
+    // MARK: History
+
+    /// On commit the tab still has the previous page's title; the new one arrives through
+    /// `tabTitleDidChange`, so an empty title keeps whatever the URL had.
+    func recordVisit(to tab: Tab, title: String = "") {
+        guard tab.url.isWebPage else { return }
+        history?.recordVisit(url: tab.url, title: title)
+    }
+
+    func tabTitleDidChange(_ tab: Tab) {
+        guard tab.url.isWebPage else { return }
+        history?.updateTitle(tab.title, for: tab.url)
+    }
+
+    /// ⌘Y opens the history page in a new tab, like Chrome.
+    func showHistory() {
+        commandBar = nil
+        openTab(url: InternalPage.history.url)
+    }
+
+    func showClearBrowsingData() {
+        commandBar = nil
+        isClearBrowsingDataPresented = true
+    }
+
+    /// Opens a page in the current tab, or a new one when there's none.
+    func navigate(to url: URL) {
+        commandBar = nil
+        if let activeTab {
+            activeTab.load(url)
+        } else {
+            openTab(url: url)
+        }
+    }
+
     // MARK: Permissions
 
     /// The prompt to show: the oldest request from the visible tab.
@@ -221,7 +267,11 @@ final class Browser {
 
     /// Reopens into the space the tab was closed from, if it still exists.
     func reopenClosedTab() {
-        guard let closed = closedTabs.popLast() else { return }
+        if let closed = closedTabs.last { reopen(closed) }
+    }
+
+    func reopen(_ closed: ClosedTab) {
+        closedTabs.removeAll { $0.id == closed.id }
         let space = spaces.first { $0.id == closed.spaceID } ?? activeSpace
         let tab = makeTab(url: closed.url, title: closed.title)
         space.todayTabs.insert(tab, at: min(closed.index, space.todayTabs.count))
@@ -387,7 +437,9 @@ final class Browser {
         commandBar = nil
     }
 
-    func open(_ url: URL, from mode: CommandBarMode) {
+    /// `isTyped` marks addresses the user typed, which Chrome ranks first in suggestions.
+    func open(_ url: URL, from mode: CommandBarMode, isTyped: Bool = false) {
+        if isTyped { history?.recordTyped(url) }
         commandBar = nil
         if mode == .editActiveTab, let activeTab {
             activeTab.load(url)

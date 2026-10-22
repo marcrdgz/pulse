@@ -96,7 +96,8 @@ struct CommandBarView: View {
 
     private func perform(_ suggestion: CommandBarSuggestion) {
         switch suggestion {
-        case .open(let url), .search(_, let url): browser.open(url, from: mode)
+        case .open(let url): browser.open(url, from: mode, isTyped: true)
+        case .search(_, let url): browser.open(url, from: mode)
         case .switchTo(let tab): browser.switchTo(tab)
         }
     }

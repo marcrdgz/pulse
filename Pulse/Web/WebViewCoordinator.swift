@@ -68,6 +68,11 @@ final class WebViewCoordinator: NSObject, WKNavigationDelegate, WKUIDelegate {
         tab?.navigationDidFail(with: error)
     }
 
+    func webView(_ webView: WKWebView, didCommit navigation: WKNavigation!) {
+        guard let tab else { return }
+        tab.browser?.recordVisit(to: tab)
+    }
+
     func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
         tab?.pageDidFinishLoading()
     }

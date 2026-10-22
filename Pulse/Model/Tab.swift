@@ -40,8 +40,10 @@ final class Tab: Identifiable {
 
     var isPinned: Bool { pinnedURL != nil }
 
+    var internalPage: InternalPage? { InternalPage(url: url) }
+
     var displayTitle: String {
-        customTitle ?? (title.isEmpty ? (url.displayHost ?? "New Tab") : title)
+        customTitle ?? internalPage?.title ?? (title.isEmpty ? (url.displayHost ?? "New Tab") : title)
     }
 
     /// Created on first access so restored and background tabs cost nothing until shown.
@@ -58,9 +60,16 @@ final class Tab: Identifiable {
     }
 
     func load(_ url: URL) {
-        self.url = url
         loadError = nil
-        loadedWebView?.load(URLRequest(url: url))
+        if let page = InternalPage(url: url) {
+            // Internal pages are drawn by Pulse; the web view comes back when navigating away.
+            unload()
+            self.url = page.url
+            title = ""
+        } else {
+            self.url = url
+            loadedWebView?.load(URLRequest(url: url))
+        }
         browser?.tabDidUpdate()
     }
 
@@ -192,10 +201,13 @@ final class Tab: Identifiable {
         if let newURL = webView.url, newURL != url {
             url = newURL
             didChangePage = true
+            // Same-document navigations (pushState) never commit, but Chrome still records them.
+            if !webView.isLoading { browser?.recordVisit(to: self, title: webView.title ?? "") }
         }
         if let newTitle = webView.title, newTitle != title {
             title = newTitle
             didChangePage = true
+            browser?.tabTitleDidChange(self)
         }
         isLoading = webView.isLoading
         estimatedProgress = webView.estimatedProgress

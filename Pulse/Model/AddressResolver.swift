@@ -13,7 +13,7 @@ enum AddressResolver {
         }
     }
 
-    private static let explicitSchemes: Set<String> = ["http", "https", "file", "about", "data"]
+    private static let explicitSchemes: Set<String> = ["http", "https", "file", "about", "data", "pulse", "chrome"]
 
     static func destination(for input: String) -> Destination? {
         let text = input.trimmingCharacters(in: .whitespacesAndNewlines)

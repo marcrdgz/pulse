@@ -6,6 +6,16 @@ struct BrowserCommands: Commands {
 
     private var activeTab: Tab? { browser.activeTab }
 
+    /// The last pages visited, one entry per URL, like Chrome's History menu.
+    private var recentlyVisited: [HistoryVisit] {
+        _ = browser.history?.revision
+        var seen: Set<URL> = []
+        return (browser.history?.visits(limit: 40) ?? [])
+            .filter { seen.insert($0.url).inserted }
+            .prefix(10)
+            .map { $0 }
+    }
+
     var body: some Commands {
         CommandGroup(after: .appInfo) {
             Button("Make Pulse Your Default Browser…") {
@@ -72,6 +82,28 @@ struct BrowserCommands: Commands {
             Button("Forward") { activeTab?.goForward() }
                 .keyboardShortcut("]")
                 .disabled(!(activeTab?.canGoForward ?? false))
+            Divider()
+            Button("Show Full History", action: browser.showHistory)
+                .keyboardShortcut("y")
+            Button("Clear Browsing Data…", action: browser.showClearBrowsingData)
+                .keyboardShortcut(.delete, modifiers: [.command, .shift])
+            Divider()
+            Menu("Recently Closed") {
+                ForEach(browser.recentlyClosedTabs) { closed in
+                    Button(closed.title.isEmpty ? closed.url.absoluteString : closed.title) {
+                        browser.reopen(closed)
+                    }
+                }
+            }
+            .disabled(browser.recentlyClosedTabs.isEmpty)
+            Divider()
+            Section("Recently Visited") {
+                ForEach(recentlyVisited, id: \.id) { visit in
+                    Button(visit.title.isEmpty ? visit.url.absoluteString : visit.title) {
+                        browser.navigate(to: visit.url)
+                    }
+                }
+            }
         }
 
         CommandMenu("Tabs") {

@@ -14,7 +14,7 @@ struct SidebarAddressBar: View {
                         .font(.system(size: 9))
                         .opacity(0.5)
                 }
-                Text(tab?.url.displayHost ?? "Search or Enter URL…")
+                Text(tab?.internalPage?.url.absoluteString ?? tab?.url.displayHost ?? "Search or Enter URL…")
                     .lineLimit(1)
                     .opacity(tab == nil ? 0.5 : 1)
                 Spacer(minLength: 0)

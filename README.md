@@ -12,6 +12,8 @@ A native macOS browser built on WebKit, with Arc's look and keyboard-first workf
 - Double-click a tab to rename it; middle-click to close it.
 - Session restore; tabs load lazily when first shown.
 - Find in page, downloads to ~/Downloads, and a native error page when a site can't load.
+- History like Chrome's: ⌘Y page grouped by day with search and multi-select delete, a History menu
+  with recently closed tabs and visits, and "Clear Browsing Data" (⌘⇧⌫).
 
 ## Shortcuts
 
@@ -32,6 +34,7 @@ A native macOS browser built on WebKit, with Arc's look and keyboard-first workf
 | ⌘F / ⌘G / ⌘⇧G | Find on page / next / previous match |
 | ⌘+ / ⌘- / ⌘0 | Zoom |
 | ⌘⌥I | Web Inspector |
+| ⌘Y / ⌘⇧⌫ | History / Clear browsing data |
 | ⌘-click | Open link in background tab |
 
 ## Development
