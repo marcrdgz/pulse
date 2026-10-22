@@ -193,7 +193,7 @@ private struct HistoryRow: View {
                 .monospacedDigit()
                 .foregroundStyle(.secondary)
                 .frame(width: 64, alignment: .leading)
-            HistoryFavicon(url: visit.url)
+            URLFavicon(url: visit.url)
             Text(visit.title.isEmpty ? visit.url.absoluteString : visit.title)
                 .lineLimit(1)
                 .layoutPriority(1)
@@ -226,25 +226,6 @@ private struct HistoryRow: View {
             }
         }
         .help(visit.url.absoluteString)
-    }
-}
-
-private struct HistoryFavicon: View {
-    let url: URL
-    @State private var icon: NSImage?
-
-    var body: some View {
-        Group {
-            if let icon {
-                Image(nsImage: icon).resizable()
-            } else {
-                Image(systemName: "globe").resizable().foregroundStyle(.secondary)
-            }
-        }
-        .frame(width: 16, height: 16)
-        .task(id: url.host()) {
-            icon = await FaviconLoader.shared.favicon(forPage: url, declaredIconURL: nil)
-        }
     }
 }
 
