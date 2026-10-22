@@ -3,6 +3,7 @@ import Foundation
 /// Pages Pulse draws itself instead of loading in WebKit, like Chrome's `chrome://` pages.
 enum InternalPage: String {
     case history
+    case downloads
 
     /// Accepts `chrome://` too, so muscle memory from Chrome keeps working.
     init?(url: URL) {
@@ -17,12 +18,14 @@ enum InternalPage: String {
     var title: String {
         switch self {
         case .history: "History"
+        case .downloads: "Downloads"
         }
     }
 
     var symbol: String {
         switch self {
         case .history: "clock.arrow.circlepath"
+        case .downloads: "arrow.down.circle"
         }
     }
 }

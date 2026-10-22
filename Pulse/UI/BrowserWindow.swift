@@ -80,6 +80,8 @@ struct BrowserWindow: View {
         if let tab = browser.activeTab, tab.internalPage == .history {
             HistoryPage(tab: tab)
                 .id(tab.id)
+        } else if browser.activeTab?.internalPage == .downloads {
+            DownloadsPage()
         } else if let tab = browser.activeTab {
             WebView(tab: tab)
                 .overlay {
@@ -197,6 +199,17 @@ private struct ToastView: View {
 }
 
 /// Window tweaks SwiftUI doesn't expose: drag-from-sidebar and hiding traffic lights with the sidebar.
+/// The browser's own window, so commands can tell it apart from Settings or panels.
+enum BrowserWindowReference {
+    static weak var window: NSWindow?
+
+    /// Whether ⌘W should close the frontmost window instead of a tab.
+    static var isOtherWindowKey: Bool {
+        guard let keyWindow = NSApp.keyWindow else { return false }
+        return keyWindow !== window
+    }
+}
+
 private struct WindowChrome: NSViewRepresentable {
     let showsTrafficLights: Bool
 
@@ -206,6 +219,7 @@ private struct WindowChrome: NSViewRepresentable {
         // The view is attached to its window only after this pass.
         DispatchQueue.main.async {
             guard let window = view.window else { return }
+            BrowserWindowReference.window = window
             window.titlebarAppearsTransparent = true
             window.isMovableByWindowBackground = false
             for button in [NSWindow.ButtonType.closeButton, .miniaturizeButton, .zoomButton] {

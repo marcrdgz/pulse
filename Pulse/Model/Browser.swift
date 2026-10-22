@@ -38,14 +38,17 @@ final class Browser {
     /// The space whose name is being edited in the sidebar.
     private(set) var renamingSpaceID: Space.ID?
     var isClearBrowsingDataPresented = false
+    /// Chrome's download bubble, anchored to the sidebar's downloads button.
+    var isDownloadsBubblePresented = false
     /// Sites waiting for a camera/microphone answer, oldest first.
     private(set) var permissionRequests: [PermissionRequest] = []
     private var closedTabs: [ClosedTab] = []
 
-    @ObservationIgnored let downloads = DownloadManager()
+    @ObservationIgnored let downloads: DownloadManager
+    @ObservationIgnored let preferences: Preferences
     @ObservationIgnored let history: HistoryStore?
     @ObservationIgnored private let sessionStore: SessionStore?
-    @ObservationIgnored private let sitePermissions: SitePermissionStore?
+    @ObservationIgnored let sitePermissions: SitePermissionStore?
     @ObservationIgnored private var saveTask: Task<Void, Never>?
     @ObservationIgnored private var toastTask: Task<Void, Never>?
 
@@ -60,7 +63,9 @@ final class Browser {
     init(
         sessionStore: SessionStore? = nil,
         history: HistoryStore? = nil,
-        sitePermissions: SitePermissionStore? = nil
+        sitePermissions: SitePermissionStore? = nil,
+        downloads: DownloadManager = DownloadManager(),
+        preferences: Preferences = Preferences()
     ) {
         let home = Space(name: "Home", theme: .purple)
         spaces = [home]
@@ -68,9 +73,12 @@ final class Browser {
         self.sessionStore = sessionStore
         self.history = history
         self.sitePermissions = sitePermissions
+        self.downloads = downloads
+        self.preferences = preferences
         downloads.browser = self
         if let session = sessionStore?.load() {
             restore(session)
+            if preferences.startupBehavior == .clearToday { clearToday() }
         }
         if activeTab == nil {
             commandBar = .newTab
@@ -197,6 +205,36 @@ final class Browser {
         guard tab.url.isWebPage else { return }
         history?.updateTitle(tab.title, for: tab.url)
     }
+
+    // MARK: Downloads
+
+    /// ⌘⇧J opens the downloads page in a new tab, like Chrome.
+    func showDownloads() {
+        commandBar = nil
+        isDownloadsBubblePresented = false
+        openTab(url: InternalPage.downloads.url)
+    }
+
+    /// Chrome opens its download bubble when a download starts; with the sidebar hidden there's
+    /// nothing to anchor it to, so a toast says it instead.
+    func downloadDidStart(_ download: Download) {
+        if isSidebarVisible {
+            isDownloadsBubblePresented = true
+        } else {
+            showToast("Downloading \(download.filename)…")
+        }
+    }
+
+    func downloadDidFinish(_ download: Download) {
+        guard !isDownloadsBubblePresented else { return }
+        switch download.state {
+        case .completed: showToast("Downloaded \(download.filename)")
+        case .failed: showToast("Couldn't download \(download.filename)")
+        default: break
+        }
+    }
+
+    // MARK: History
 
     /// ⌘Y opens the history page in a new tab, like Chrome.
     func showHistory() {
@@ -559,6 +597,16 @@ final class Browser {
             let tabs = favorites + space.tabs
             if !tabs.contains(where: { $0.id == space.activeTabID }) {
                 space.activeTabID = (space.todayTabs.first ?? space.pinnedTabs.first ?? favorites.first)?.id
+            }
+        }
+    }
+
+    /// "Start with an empty Today": favorites and pinned tabs stay, today tabs are closed.
+    private func clearToday() {
+        for space in spaces {
+            space.todayTabs.removeAll()
+            if !(favorites + space.pinnedTabs).contains(where: { $0.id == space.activeTabID }) {
+                space.activeTabID = nil
             }
         }
     }

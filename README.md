@@ -13,7 +13,11 @@ A native macOS browser built on WebKit, with Arc's look and keyboard-first workf
 - Drag tabs to reorder them, or between Favorites, Pinned and Today; resize the sidebar by its edge.
 - Double-click a tab to rename it; middle-click to close it.
 - Session restore; tabs load lazily when first shown.
-- Find in page, downloads to ~/Downloads, and a native error page when a site can't load.
+- Find in page and a native error page when a site can't load.
+- Downloads like Chrome's: a bubble with progress, pause/resume, cancel and retry, and a ⌘⇧J page
+  that remembers past downloads.
+- Settings (⌘,): startup behavior, default browser, search engine and suggestions, download
+  location prompt, per-site camera/microphone permissions.
 - History like Chrome's: ⌘Y page grouped by day with search and multi-select delete, a History menu
   with recently closed tabs and visits, and "Clear Browsing Data" (⌘⇧⌫).
 
@@ -37,6 +41,7 @@ A native macOS browser built on WebKit, with Arc's look and keyboard-first workf
 | ⌘+ / ⌘- / ⌘0 | Zoom |
 | ⌘⌥I | Web Inspector |
 | ⌘Y / ⌘⇧⌫ | History / Clear browsing data |
+| ⌘⇧J | Downloads |
 | ⌘-click | Open link in background tab |
 
 ## Development

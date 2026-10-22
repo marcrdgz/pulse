@@ -2,13 +2,8 @@ import Foundation
 
 /// Query suggestions from the search engine, like Chrome's address bar shows.
 enum SearchSuggestions {
-    static func fetch(for query: String, limit: Int = 4) async -> [String] {
-        var components = URLComponents(string: "https://suggestqueries.google.com/complete/search")!
-        components.queryItems = [
-            URLQueryItem(name: "client", value: "firefox"),
-            URLQueryItem(name: "q", value: query),
-        ]
-        guard let url = components.url,
+    static func fetch(for query: String, from engine: SearchEngine, limit: Int = 4) async -> [String] {
+        guard let url = engine.suggestionsURL(for: query),
               let (data, _) = try? await URLSession.shared.data(from: url),
               // ["query", ["suggestion 1", "suggestion 2", …]]
               let response = try? JSONSerialization.jsonObject(with: data) as? [Any],

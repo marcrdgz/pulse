@@ -41,6 +41,7 @@ enum Omnibox {
         openTabs: [Tab],
         searchSuggestions: [String],
         allowsInlineCompletion: Bool,
+        searchEngine: SearchEngine = .google,
         now: Date = .now
     ) -> OmniboxResult {
         let text = input.trimmingCharacters(in: .whitespaces)
@@ -61,7 +62,7 @@ enum Omnibox {
             inlineCompletion = text + fill.dropFirst(needle.count)
             suggestions.append(.navigate(url, title: url == best.url ? best.title : nil))
         }
-        if let destination = AddressResolver.destination(for: text) {
+        if let destination = AddressResolver.destination(for: text, searchEngine: searchEngine) {
             switch destination {
             case .url(let url): suggestions.append(.navigate(url, title: nil))
             case .search(let query, let url): suggestions.append(.search(query: query, url: url))
@@ -81,7 +82,7 @@ enum Omnibox {
         suggestions += matchingTabs.prefix(3).map(OmniboxSuggestion.switchTo)
         suggestions += searchSuggestions
             .filter { $0.lowercased() != needle }
-            .compactMap { query in AddressResolver.searchURL(for: query).map { .search(query: query, url: $0) } }
+            .compactMap { query in searchEngine.searchURL(for: query).map { .search(query: query, url: $0) } }
 
         return OmniboxResult(suggestions: deduplicated(suggestions), inlineCompletion: inlineCompletion)
     }

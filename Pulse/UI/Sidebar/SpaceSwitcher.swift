@@ -12,6 +12,9 @@ struct SpaceSwitcher: View {
                     .help(index < 9 ? "\(space.name) (⌃\(index + 1))" : space.name)
             }
             Spacer(minLength: 0)
+            if !browser.downloads.downloads.isEmpty {
+                DownloadsButton()
+            }
             Button { browser.createSpace() } label: {
                 Image(systemName: "plus")
                     .font(.system(size: 12, weight: .semibold))

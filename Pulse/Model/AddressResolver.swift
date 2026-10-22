@@ -15,20 +15,14 @@ enum AddressResolver {
 
     private static let explicitSchemes: Set<String> = ["http", "https", "file", "about", "data", "pulse", "chrome"]
 
-    static func destination(for input: String) -> Destination? {
+    static func destination(for input: String, searchEngine: SearchEngine = .google) -> Destination? {
         let text = input.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !text.isEmpty else { return nil }
 
         if let url = explicitURL(text) ?? implicitURL(text) {
             return .url(url)
         }
-        return searchURL(for: text).map { .search(query: text, url: $0) }
-    }
-
-    static func searchURL(for query: String) -> URL? {
-        var components = URLComponents(string: "https://www.google.com/search")
-        components?.queryItems = [URLQueryItem(name: "q", value: query)]
-        return components?.url
+        return searchEngine.searchURL(for: text).map { .search(query: text, url: $0) }
     }
 
     private static func explicitURL(_ text: String) -> URL? {

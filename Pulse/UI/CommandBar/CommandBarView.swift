@@ -25,7 +25,8 @@ struct CommandBarView: View {
             history: browser.history?.entries(matching: text) ?? [],
             openTabs: browser.everyTab,
             searchSuggestions: searchSuggestions,
-            allowsInlineCompletion: allowsInlineCompletion
+            allowsInlineCompletion: allowsInlineCompletion,
+            searchEngine: browser.preferences.searchEngine
         )
     }
 
@@ -125,20 +126,21 @@ struct CommandBarView: View {
 
     private func loadSearchSuggestions() async {
         let query = text.trimmingCharacters(in: .whitespaces)
-        guard hasEdited, !query.isEmpty else {
+        guard hasEdited, !query.isEmpty, browser.preferences.showsSearchSuggestions else {
             searchSuggestions = []
             return
         }
         // Debounce typing; a new keystroke cancels this task.
         try? await Task.sleep(for: .milliseconds(150))
         guard !Task.isCancelled else { return }
-        let suggestions = await SearchSuggestions.fetch(for: query)
+        let suggestions = await SearchSuggestions.fetch(for: query, from: browser.preferences.searchEngine)
         guard !Task.isCancelled else { return }
         searchSuggestions = suggestions
     }
 }
 
 private struct SuggestionRow: View {
+    @Environment(Browser.self) private var browser
     let suggestion: OmniboxSuggestion
     let isSelected: Bool
     let remove: (() -> Void)?
@@ -212,7 +214,7 @@ private struct SuggestionRow: View {
     private var detail: String? {
         switch suggestion {
         case .navigate(let url, let title): title.flatMap { $0.isEmpty ? nil : url.omniboxText }
-        case .search: "Google Search"
+        case .search: browser.preferences.searchEngine.searchLabel
         case .switchTo(let tab): tab.url.displayHost
         }
     }

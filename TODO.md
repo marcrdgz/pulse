@@ -8,8 +8,8 @@
 - [ ] Drag a tab onto a space dot to move it there.
 - [ ] Space icons (emoji) and reordering spaces.
 - [ ] Folders in the pinned section.
-- [ ] Downloads list (progress, reveal in Finder, cancel); today only a toast.
-- [ ] Preferences (search engine, sidebar color).
+- [ ] Custom download folder (needs a security-scoped bookmark entitlement).
+- [ ] Apple Passwords: needs a Developer ID and Apple's browser allowlist (apple/password-manager-resources).
 - [ ] Little Arc (lightweight window for links opened from other apps).
 - [ ] Split view.
 - [ ] Auto-archive Today tabs after 12 hours.

@@ -1,3 +1,4 @@
+import AppKit
 import SwiftUI
 
 /// Every keyboard shortcut lives here, as a menu item, mirroring Arc's bindings.
@@ -29,9 +30,15 @@ struct BrowserCommands: Commands {
             Button("Open Location…") { browser.showCommandBar(.editActiveTab) }
                 .keyboardShortcut("l")
             Divider()
-            Button(activeTab?.isPinned == true ? "Reset Pinned Tab" : "Close Tab", action: browser.closeActiveTab)
-                .keyboardShortcut("w")
-                .disabled(activeTab == nil)
+            // Replacing the system "Close" item also took ⌘W from Settings and other windows.
+            Button(activeTab?.isPinned == true ? "Reset Pinned Tab" : "Close Tab") {
+                if BrowserWindowReference.isOtherWindowKey {
+                    NSApp.keyWindow?.performClose(nil)
+                } else {
+                    browser.closeActiveTab()
+                }
+            }
+            .keyboardShortcut("w")
             Button("Reopen Closed Tab", action: browser.reopenClosedTab)
                 .keyboardShortcut("t", modifiers: [.command, .shift])
                 .disabled(!browser.canReopenClosedTab)
@@ -85,6 +92,8 @@ struct BrowserCommands: Commands {
             Divider()
             Button("Show Full History", action: browser.showHistory)
                 .keyboardShortcut("y")
+            Button("Downloads", action: browser.showDownloads)
+                .keyboardShortcut("j", modifiers: [.command, .shift])
             Button("Clear Browsing Data…", action: browser.showClearBrowsingData)
                 .keyboardShortcut(.delete, modifiers: [.command, .shift])
             Divider()
