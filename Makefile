@@ -14,10 +14,11 @@ generate:
 build:
 	$(XCODEBUILD) -configuration Debug build
 
-# Quits a running copy first, otherwise `open` would just focus the stale build.
+# Quits a running copy first, otherwise `open` would just focus the stale build. A real quit,
+# not pkill: SIGTERM skips willTerminate, so the debounced session save would be lost.
 run: build
-	-pkill -x "Pulse Dev"
-	@# pkill doesn't wait; opening while the old copy is still exiting fails with LaunchServices -609.
+	-osascript -e 'quit app id "dev.doblefilo.pulse.dev"'
+	@# Opening while the old copy is still exiting fails with LaunchServices -609.
 	@while pgrep -qx "Pulse Dev"; do sleep 0.1; done
 	open "$(DEV_APP)"
 

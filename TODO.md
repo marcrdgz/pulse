@@ -13,7 +13,3 @@
 - [ ] Little Arc (lightweight window for links opened from other apps).
 - [ ] Split view.
 - [ ] Auto-archive Today tabs after 12 hours.
-
-## Bugs
-
-- [ ] Unreproduced: during manual testing the session once lost two Today tabs.
