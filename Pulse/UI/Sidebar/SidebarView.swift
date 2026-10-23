@@ -27,7 +27,7 @@ struct SidebarView: View {
             SpaceSwitcher()
         }
         .padding(.horizontal, 10)
-        .padding(.bottom, 6)
+        .padding(.bottom, 10)
         .foregroundStyle(Theme.sidebarText)
         .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { frame = $0 }
         .animation(.snappy(duration: 0.22), value: browser.favorites.isEmpty)

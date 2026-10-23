@@ -8,6 +8,8 @@ enum Theme {
     static let contentInset: CGFloat = 8
     static let contentCornerRadius: CGFloat = 10
     static let rowCornerRadius: CGFloat = 8
+    /// Arc's bottom-bar targets are larger than the toolbar's.
+    static let bottomBarButtonSize: CGFloat = 30
 
     static func sidebarGradient(_ theme: SpaceTheme) -> LinearGradient {
         let palette = palette(theme)
@@ -44,18 +46,22 @@ enum Theme {
 
 /// Borderless icon button with Arc's subtle hover highlight.
 struct SidebarIconButtonStyle: ButtonStyle {
+    /// The hover square's side; the bottom bar uses Arc's larger targets.
+    var size: CGFloat = 26
+
     func makeBody(configuration: Configuration) -> some View {
-        SidebarIconButton(configuration: configuration)
+        SidebarIconButton(configuration: configuration, size: size)
     }
 
     private struct SidebarIconButton: View {
         let configuration: Configuration
+        let size: CGFloat
         @State private var isHovered = false
         @Environment(\.isEnabled) private var isEnabled
 
         var body: some View {
             configuration.label
-                .frame(minWidth: 26, minHeight: 26)
+                .frame(minWidth: size, minHeight: size)
                 .background(
                     RoundedRectangle(cornerRadius: 6, style: .continuous)
                         .fill(isHovered && isEnabled ? Theme.hoverFill : .clear)

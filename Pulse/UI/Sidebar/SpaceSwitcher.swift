@@ -22,8 +22,8 @@ struct SpaceSwitcher: View {
                         .help(index < 9 ? "\(space.name) (⌃\(index + 1))" : space.name)
                 }
                 if let draft {
-                    SpaceIcon(space: draft, size: 10)
-                        .frame(width: 22, height: 22)
+                    SpaceIcon(space: draft, size: SpaceDot.prominentSize(for: draft))
+                        .frame(width: Theme.bottomBarButtonSize, height: Theme.bottomBarButtonSize)
                         .transition(.scale.combined(with: .opacity))
                 }
             }
@@ -33,7 +33,7 @@ struct SpaceSwitcher: View {
             }
             .frame(width: Self.edgeWidth, alignment: .trailing)
         }
-        .frame(height: 28)
+        .frame(height: 34)
         .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { frame in
             dragController.spaceSwitcherFrame = frame
         }
@@ -41,7 +41,7 @@ struct SpaceSwitcher: View {
         .animation(.snappy(duration: 0.2), value: draft == nil)
     }
 
-    private static let edgeWidth: CGFloat = 28
+    private static let edgeWidth = Theme.bottomBarButtonSize
 }
 
 /// Arc's "+" at the bottom right: a small menu of things to create, with the button turning into
@@ -53,12 +53,12 @@ private struct NewItemButton: View {
     var body: some View {
         Button { isMenuPresented.toggle() } label: {
             Image(systemName: isMenuPresented ? "xmark" : "plus")
-                .font(.system(size: 13, weight: .semibold))
+                .font(.system(size: 16, weight: .medium))
                 .contentTransition(.symbolEffect(.replace))
         }
-        .buttonStyle(SidebarIconButtonStyle())
-        .help("New…")
-        .accessibilityLabel("New")
+        .buttonStyle(SidebarIconButtonStyle(size: Theme.bottomBarButtonSize))
+        .help("New Tab or Space")
+        .accessibilityLabel("New Tab or Space")
         .popover(isPresented: $isMenuPresented, arrowEdge: .top) {
             VStack(spacing: 0) {
                 NewItemRow(title: "New Space", symbol: "plus.square.on.square") {
@@ -74,7 +74,7 @@ private struct NewItemButton: View {
                 }
             }
             .padding(8)
-            .frame(width: 210)
+            .frame(width: 220)
         }
     }
 }
@@ -90,21 +90,21 @@ private struct NewItemRow: View {
         Button(action: action) {
             HStack(spacing: 12) {
                 Image(systemName: symbol)
-                    .font(.system(size: 16))
-                    .frame(width: 22)
+                    .font(.system(size: 18))
+                    .frame(width: 24)
                 Text(title)
-                    .font(.system(size: 13, weight: .medium))
+                    .font(.system(size: 14, weight: .medium))
                 Spacer(minLength: 0)
                 if let shortcut {
                     Text(shortcut)
-                        .font(.system(size: 12))
+                        .font(.system(size: 13))
                         .foregroundStyle(.secondary)
                 }
             }
             .padding(.horizontal, 10)
-            .frame(height: 34)
+            .frame(height: 40)
             .background(
-                RoundedRectangle(cornerRadius: Theme.rowCornerRadius, style: .continuous)
+                RoundedRectangle(cornerRadius: 10, style: .continuous)
                     .fill(Color.accentColor.opacity(isHovered ? 0.18 : 0))
             )
             .contentShape(Rectangle())
@@ -126,12 +126,12 @@ struct SpaceDot: View {
         let isHovered = dragController?.hoveredSpaceID == space.id
         let isProminent = isActive || isHovered || dragController?.draggedSpaceID == space.id
         Button { browser.selectSpace(space) } label: {
-            SpaceIcon(space: space, size: isProminent ? 10 : 7)
-                .opacity(isProminent ? 1 : 0.55)
-                .frame(width: 22, height: 22)
-                .contentShape(Rectangle())
+            SpaceIcon(space: space, size: isProminent ? Self.prominentSize(for: space) : Self.restingSize(for: space))
+                // Arc keeps emojis one size and mutes the inactive ones instead.
+                .grayscale(isProminent ? 0 : 1)
+                .opacity(isProminent ? 1 : space.icon == nil ? 0.55 : 0.8)
         }
-        .buttonStyle(.plain)
+        .buttonStyle(SidebarIconButtonStyle(size: Theme.bottomBarButtonSize))
         .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { frame in
             dragController?.spaceDotFrames[space.id] = frame
         }
@@ -159,7 +159,7 @@ struct SpaceDot: View {
                     )
                     // The active space is no drop target.
                     .opacity(isActive ? 0.6 : 1)
-                    .offset(y: -26)
+                    .offset(y: -Theme.bottomBarButtonSize - 4)
                     .allowsHitTesting(false)
                     .transition(.opacity)
             }
@@ -173,6 +173,15 @@ struct SpaceDot: View {
                 .environment(browser)
         }
         .contextMenu { SpaceContextMenu(space: space, canChangeIcon: dragController != nil) }
+    }
+
+    /// `SpaceIcon` sizes: a dot grows when prominent, an emoji (drawn 4pt larger) stays at Arc's 16pt.
+    static func prominentSize(for space: Space) -> CGFloat {
+        space.icon == nil ? 10 : 12
+    }
+
+    private static func restingSize(for space: Space) -> CGFloat {
+        space.icon == nil ? 7 : 12
     }
 
     private var isIconPickerPresented: Binding<Bool> {

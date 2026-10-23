@@ -13,7 +13,7 @@ struct DownloadsButton: View {
             if let progress = browser.downloads.activeProgress {
                 ZStack {
                     Image(systemName: "arrow.down")
-                        .font(.system(size: 10, weight: .bold))
+                        .font(.system(size: 11, weight: .bold))
                     Circle()
                         .stroke(Theme.sidebarText.opacity(0.25), lineWidth: 1.5)
                     Circle()
@@ -22,13 +22,13 @@ struct DownloadsButton: View {
                         .rotationEffect(.degrees(-90))
                         .animation(.easeOut(duration: 0.2), value: progress)
                 }
-                .frame(width: 16, height: 16)
+                .frame(width: 18, height: 18)
             } else {
                 Image(systemName: "tray.and.arrow.down")
-                    .font(.system(size: 13, weight: .medium))
+                    .font(.system(size: 16, weight: .medium))
             }
         }
-        .buttonStyle(SidebarIconButtonStyle())
+        .buttonStyle(SidebarIconButtonStyle(size: Theme.bottomBarButtonSize))
         .help("Downloads (⌘⇧J)")
         .accessibilityLabel("Downloads")
         .popover(isPresented: $browser.isDownloadsBubblePresented, arrowEdge: .top) {
@@ -49,7 +49,7 @@ private struct DownloadsBubble: View {
                 .padding(.top, 12)
                 .padding(.bottom, 6)
             if browser.downloads.downloads.isEmpty {
-                Text("No downloads yet")
+                Text("Files you download will show up here.")
                     .foregroundStyle(.secondary)
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 16)
