@@ -30,6 +30,8 @@ A native macOS browser built on WebKit, with Arc's look and keyboard-first workf
   Chrome…) and offers to make Pulse the default browser.
 - Settings (⌘,): startup behavior, default browser, search engine and suggestions, download
   location prompt, per-site camera/microphone permissions.
+- Ad and tracker blocking with EasyList and EasyPrivacy, compiled into WebKit content rules and
+  refreshed every four days; allow ads per site from the address bar's menu.
 - History like Chrome's: ⌘Y page grouped by day with search and multi-select delete, a History menu
   with recently closed tabs and visits, and "Clear Browsing Data" (⌘⇧⌫).
 

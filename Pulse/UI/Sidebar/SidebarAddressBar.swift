@@ -18,6 +18,12 @@ struct SidebarAddressBar: View {
                     .lineLimit(1)
                     .opacity(tab == nil ? 0.5 : 1)
                 Spacer(minLength: 0)
+                if let tab, isAllowingAds(on: tab) {
+                    Image(systemName: "shield.slash")
+                        .font(.system(size: 11))
+                        .opacity(0.5)
+                        .help("Ads and trackers are allowed on this site")
+                }
             }
             .font(.system(size: 13))
             .padding(.horizontal, 10)
@@ -43,8 +49,21 @@ struct SidebarAddressBar: View {
                 ShareLink(item: tab.url)
                 Divider()
                 Button("Reload Page") { tab.reload() }
+                if browser.contentBlocker.isEnabled, tab.url.isWebPage, let site = tab.url.displayHost {
+                    Divider()
+                    Button(isAllowingAds(on: tab) ? "Block Ads on \(site)" : "Allow Ads on \(site)") {
+                        browser.toggleContentBlocking(on: tab)
+                    }
+                }
             }
         }
+    }
+}
+
+extension SidebarAddressBar {
+    /// Only worth showing while blocking is on: then it's the exception.
+    private func isAllowingAds(on tab: Tab) -> Bool {
+        browser.contentBlocker.isEnabled && tab.url.isWebPage && !browser.contentBlocker.isBlocking(on: tab.url)
     }
 }
 

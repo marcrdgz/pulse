@@ -101,11 +101,26 @@ private struct PrivacySettings: View {
     @State private var sites: [(origin: String, decisions: [PermissionKind: Bool])] = []
 
     var body: some View {
+        let blocker = browser.contentBlocker
         Form {
             Section {
                 LabeledContent("Delete history, cookies and cache") {
                     Button("Clear Browsing Data…", action: browser.showClearBrowsingData)
                 }
+            }
+            Section {
+                Toggle("Block ads and trackers", isOn: Binding(get: { blocker.isEnabled }, set: { blocker.setEnabled($0) }))
+                ForEach(browser.preferences.adsAllowedSites, id: \.self) { site in
+                    LabeledContent(site) {
+                        Button("Block Ads") { blocker.setBlocking(true, onSite: site) }
+                    }
+                }
+            } header: {
+                Text("Ads and trackers")
+            } footer: {
+                Text(contentBlockerFooter(lastUpdate: blocker.lastUpdate))
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
             }
             Section("Site permissions") {
                 if sites.isEmpty {
@@ -138,6 +153,13 @@ private struct PrivacySettings: View {
 
     private func reload() {
         sites = browser.sitePermissions?.allDecisions() ?? []
+    }
+
+    private func contentBlockerFooter(lastUpdate: Date?) -> String {
+        let lists = "Uses EasyList and EasyPrivacy"
+        guard let lastUpdate else { return lists + "; they download the first time Pulse runs." }
+        return lists + ", updated \(lastUpdate.formatted(.relative(presentation: .named))). "
+            + "Sites listed above load ads; allow one from its address bar's menu."
     }
 
     private func binding(_ origin: String, _ kind: PermissionKind) -> Binding<Bool?> {

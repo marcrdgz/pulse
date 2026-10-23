@@ -55,6 +55,7 @@ final class Browser {
     private var closedTabs: [ClosedTab] = []
 
     @ObservationIgnored let downloads: DownloadManager
+    @ObservationIgnored let contentBlocker: ContentBlocker
     @ObservationIgnored let preferences: Preferences
     @ObservationIgnored let history: HistoryStore?
     @ObservationIgnored private let sessionStore: SessionStore?
@@ -75,6 +76,7 @@ final class Browser {
         history: HistoryStore? = nil,
         sitePermissions: SitePermissionStore? = nil,
         downloads: DownloadManager = DownloadManager(),
+        contentBlocker: ContentBlocker = ContentBlocker(),
         preferences: Preferences = Preferences()
     ) {
         let home = Space(name: "Home", theme: .purple)
@@ -84,8 +86,11 @@ final class Browser {
         self.history = history
         self.sitePermissions = sitePermissions
         self.downloads = downloads
+        self.contentBlocker = contentBlocker
         self.preferences = preferences
         downloads.browser = self
+        contentBlocker.browser = self
+        contentBlocker.start()
         if let session = sessionStore?.load() {
             restore(session)
             if preferences.startupBehavior == .clearToday { clearToday() }
@@ -285,6 +290,22 @@ final class Browser {
         case .failed: showToast("Couldn't download \(download.filename)")
         default: break
         }
+    }
+
+    // MARK: Content blocking
+
+    /// Applies new lists, or a changed setting, to every page that's loaded.
+    func contentRulesDidChange() {
+        everyTab.forEach { $0.applyContentRules(forPageAt: $0.url) }
+    }
+
+    /// Allows or blocks ads on the tab's site and reloads it, so the page shows the change.
+    func toggleContentBlocking(on tab: Tab) {
+        guard let site = tab.url.displayHost else { return }
+        let isBlocking = !contentBlocker.isBlocking(on: tab.url)
+        contentBlocker.setBlocking(isBlocking, onSite: site)
+        tab.reload()
+        showToast(isBlocking ? "Blocking Ads on \(site)" : "Allowed Ads on \(site)")
     }
 
     // MARK: History

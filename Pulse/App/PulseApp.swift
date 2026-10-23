@@ -10,6 +10,7 @@ struct PulseApp: App {
             history: .standard(),
             sitePermissions: SitePermissionStore(defaults: .standard),
             downloads: DownloadManager(recordsURL: supportDirectory.appending(path: "Downloads.json"), preferences: preferences),
+            contentBlocker: ContentBlocker(store: .default(), defaults: .standard, preferences: preferences),
             preferences: preferences
         )
     }()

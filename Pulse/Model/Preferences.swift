@@ -86,6 +86,9 @@ final class Preferences {
     var startupBehavior: StartupBehavior { didSet { save(startupBehavior.rawValue, Key.startup) } }
     var asksWhereToSaveDownloads: Bool { didSet { save(asksWhereToSaveDownloads, Key.askDownloadLocation) } }
     var hasCompletedOnboarding: Bool { didSet { save(hasCompletedOnboarding, Key.onboarding) } }
+    var blocksAdsAndTrackers: Bool { didSet { save(blocksAdsAndTrackers, Key.blocksAds) } }
+    /// Sites (without `www.`) where ads and trackers load, sorted.
+    var adsAllowedSites: [String] { didSet { save(adsAllowedSites, Key.adsAllowedSites) } }
 
     @ObservationIgnored private let defaults: UserDefaults?
 
@@ -95,6 +98,8 @@ final class Preferences {
         static let startup = "startupBehavior"
         static let askDownloadLocation = "asksWhereToSaveDownloads"
         static let onboarding = "hasCompletedOnboarding"
+        static let blocksAds = "blocksAdsAndTrackers"
+        static let adsAllowedSites = "adsAllowedSites"
     }
 
     init(defaults: UserDefaults? = nil) {
@@ -104,6 +109,8 @@ final class Preferences {
         startupBehavior = defaults?.string(forKey: Key.startup).flatMap(StartupBehavior.init) ?? .continueWhereYouLeftOff
         asksWhereToSaveDownloads = defaults?.bool(forKey: Key.askDownloadLocation) ?? false
         hasCompletedOnboarding = defaults?.bool(forKey: Key.onboarding) ?? false
+        blocksAdsAndTrackers = defaults?.object(forKey: Key.blocksAds) as? Bool ?? true
+        adsAllowedSites = defaults?.stringArray(forKey: Key.adsAllowedSites) ?? []
     }
 
     private func save(_ value: Any, _ key: String) {

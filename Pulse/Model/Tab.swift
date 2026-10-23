@@ -28,6 +28,7 @@ final class Tab: Identifiable {
     @ObservationIgnored private var loadedWebView: WKWebView?
     @ObservationIgnored private var coordinator: WebViewCoordinator?
     @ObservationIgnored private var observations: [NSKeyValueObservation] = []
+    @ObservationIgnored private var appliedRuleListIDs: [String] = []
 
     struct LoadError: Equatable {
         let url: URL
@@ -163,9 +164,22 @@ final class Tab: Identifiable {
         inspector.perform(NSSelectorFromString("show"))
     }
 
+    /// Pages load with the content blocker's rules unless the user allowed ads on their site.
+    /// Called before each main-frame navigation, since the rules depend on the page's site.
+    func applyContentRules(forPageAt pageURL: URL) {
+        guard let controller = loadedWebView?.configuration.userContentController else { return }
+        let lists = browser?.contentBlocker.rules(forPageAt: pageURL) ?? []
+        let identifiers = lists.compactMap(\.identifier)
+        guard identifiers != appliedRuleListIDs else { return }
+        controller.removeAllContentRuleLists()
+        lists.forEach(controller.add)
+        appliedRuleListIDs = identifiers
+    }
+
     /// Drops the web view (and its process memory); the tab reloads lazily when shown again.
     func unload() {
         observations.removeAll()
+        appliedRuleListIDs = []
         loadedWebView?.stopLoading()
         loadedWebView?.removeFromSuperview()
         loadedWebView = nil
@@ -212,6 +226,7 @@ final class Tab: Identifiable {
         webView.isInspectable = true
         self.coordinator = coordinator
         loadedWebView = webView
+        applyContentRules(forPageAt: url)
 
         observations = [
             webView.observe(\.url) { [weak self] _, _ in MainActor.assumeIsolated { self?.syncWithWebView() } },
