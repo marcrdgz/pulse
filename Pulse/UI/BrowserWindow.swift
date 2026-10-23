@@ -86,21 +86,32 @@ struct BrowserWindow: View {
         }
     }
 
-    @ViewBuilder private var content: some View {
+    /// Panes are keyed by tab, so a tab keeps its web view's container when a split forms or
+    /// separates. Moving the web view between containers lets the outgoing one, still on screen
+    /// during its transition, take it back and leave the page blank.
+    private var content: some View {
         let tabs = browser.visibleTabs
-        Group {
-            if let split = browser.activeSplit, tabs.count == 2 {
-                SplitPanes(split: split) {
-                    card { banner; page(for: tabs[0]) }
-                } trailing: {
-                    card { page(for: tabs[1]) }
-                }
-            } else {
-                card {
-                    banner
-                    if let tab = tabs.first {
+        let split = browser.activeSplit
+        return GeometryReader { proxy in
+            let available = max(proxy.size.width - Theme.contentInset, 1)
+            HStack(spacing: Theme.contentInset) {
+                ForEach(Array(tabs.enumerated()), id: \.element.id) { index, tab in
+                    let isLeadingPane = index == 0 && tabs.count == 2
+                    card {
+                        if index == 0 { banner }
                         page(for: tab)
-                    } else {
+                    }
+                    .frame(width: isLeadingPane ? available * (split?.ratio ?? 0.5) : nil)
+                    .overlay(alignment: .trailing) {
+                        if isLeadingPane {
+                            SplitDivider(available: available)
+                                .offset(x: Theme.contentInset)
+                        }
+                    }
+                }
+                if tabs.isEmpty {
+                    card {
+                        banner
                         EmptyStateView()
                     }
                 }
@@ -436,27 +447,14 @@ private struct SplitDropCard: View {
     }
 }
 
-/// Two pages side by side, split by a gap that drags to resize them.
-private struct SplitPanes<Leading: View, Trailing: View>: View {
+/// The gap between split view panes; dragging it resizes them.
+private struct SplitDivider: View {
     @Environment(Browser.self) private var browser
-    let split: TabSplit
-    @ViewBuilder let leading: Leading
-    @ViewBuilder let trailing: Trailing
+    /// The width both panes share.
+    let available: Double
     @State private var ratioAtDragStart: Double?
 
     var body: some View {
-        GeometryReader { proxy in
-            let available = max(proxy.size.width - Theme.contentInset, 1)
-            HStack(spacing: 0) {
-                leading
-                    .frame(width: available * split.ratio)
-                divider(available: available)
-                trailing
-            }
-        }
-    }
-
-    private func divider(available: Double) -> some View {
         Color.clear
             .frame(width: Theme.contentInset)
             .contentShape(Rectangle())
@@ -466,7 +464,7 @@ private struct SplitPanes<Leading: View, Trailing: View>: View {
             .gesture(
                 DragGesture(minimumDistance: 0, coordinateSpace: .global)
                     .onChanged { value in
-                        let start = ratioAtDragStart ?? split.ratio
+                        let start = ratioAtDragStart ?? browser.activeSplit?.ratio ?? 0.5
                         ratioAtDragStart = start
                         browser.setSplitRatio(start + value.translation.width / available)
                     }
