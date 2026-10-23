@@ -15,6 +15,13 @@ struct TabPosition: Hashable {
     var index: Int
 }
 
+/// A transient notice in the window's top-right corner, like Arc's.
+struct Toast: Equatable {
+    let message: String
+    /// Offered through a share button when set.
+    var sharedURL: URL?
+}
+
 enum CommandBarMode: Hashable {
     case newTab
     case editActiveTab
@@ -28,7 +35,7 @@ final class Browser {
     private(set) var spaces: [Space]
     private(set) var activeSpaceID: Space.ID
     private(set) var commandBar: CommandBarMode?
-    private(set) var toast: String?
+    private(set) var toast: Toast?
     var isSidebarExpanded = true
     private(set) var isFindBarVisible = false
     /// Bumped on every ⌘F so the find bar refocuses its field even when already open.
@@ -467,7 +474,7 @@ final class Browser {
     func copyURL(of tab: Tab) {
         NSPasteboard.general.clearContents()
         NSPasteboard.general.setString(tab.url.absoluteString, forType: .string)
-        showToast("Copied URL")
+        showToast("Copied Current URL", sharing: tab.url)
     }
 
     // MARK: Command bar
@@ -528,11 +535,26 @@ final class Browser {
         isSidebarExpanded.toggle()
     }
 
-    func showToast(_ message: String) {
-        toast = message
+    func showToast(_ message: String, sharing sharedURL: URL? = nil) {
+        toast = Toast(message: message, sharedURL: sharedURL)
+        scheduleToastDismissal()
+    }
+
+    /// Hovering holds the toast so its share button stays reachable.
+    func setToastHovered(_ isHovered: Bool) {
+        if isHovered {
+            toastTask?.cancel()
+        } else {
+            scheduleToastDismissal()
+        }
+    }
+
+    private func scheduleToastDismissal() {
         toastTask?.cancel()
+        // Toasts with an action stay longer so there's time to reach for it.
+        let duration: Duration = toast?.sharedURL == nil ? .seconds(1.5) : .seconds(2.5)
         toastTask = Task { [weak self] in
-            try? await Task.sleep(for: .seconds(1.5))
+            try? await Task.sleep(for: duration)
             guard !Task.isCancelled else { return }
             self?.toast = nil
         }

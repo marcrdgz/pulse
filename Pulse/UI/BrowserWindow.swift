@@ -43,8 +43,8 @@ struct BrowserWindow: View {
             }
 
             if let toast = browser.toast {
-                ToastView(message: toast)
-                    .transition(.slide(from: .bottom, reduceMotion: reduceMotion))
+                ToastView(toast: toast, theme: browser.activeSpace.theme, onHover: browser.setToastHovered)
+                    .transition(.slide(from: .top, reduceMotion: reduceMotion))
             }
         }
         .ignoresSafeArea()
@@ -193,18 +193,47 @@ private struct EmptyStateView: View {
 }
 
 private struct ToastView: View {
-    let message: String
+    let toast: Toast
+    let theme: SpaceTheme
+    let onHover: (Bool) -> Void
 
     var body: some View {
-        Text(message)
-            .font(.system(size: 13, weight: .medium))
-            .padding(.horizontal, 14)
-            .padding(.vertical, 8)
-            .background(.regularMaterial, in: Capsule())
-            .shadow(color: .black.opacity(0.15), radius: 8, y: 2)
-            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
-            .padding(.bottom, 28)
-            .allowsHitTesting(false)
+        HStack(spacing: 12) {
+            Text(toast.message)
+                .font(.system(size: 13, weight: .medium))
+                .lineLimit(1)
+            if let url = toast.sharedURL {
+                ShareLink(item: url) {
+                    Image(systemName: "square.and.arrow.up")
+                        .font(.system(size: 12, weight: .medium))
+                        .frame(width: 26, height: 26)
+                        .background(Theme.activeTabFill, in: RoundedRectangle(cornerRadius: 7, style: .continuous))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 7, style: .continuous)
+                                .strokeBorder(.primary.opacity(0.1))
+                        )
+                }
+                .buttonStyle(.plain)
+                .help("Share")
+            }
+        }
+        .foregroundStyle(Theme.sidebarText)
+        .padding(.leading, 14)
+        .padding(.trailing, toast.sharedURL == nil ? 14 : 6)
+        .padding(.vertical, 6)
+        .frame(minHeight: 38)
+        .background(Theme.sidebarGradient(theme), in: shape)
+        .overlay(shape.strokeBorder(.white.opacity(0.35)))
+        .shadow(color: .black.opacity(0.18), radius: 10, y: 3)
+        .onHover(perform: onHover)
+        .accessibilityElement(children: .combine)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
+        .padding(.top, 16)
+        .padding(.trailing, 16)
+    }
+
+    private var shape: RoundedRectangle {
+        RoundedRectangle(cornerRadius: 12, style: .continuous)
     }
 }
 
