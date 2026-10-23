@@ -9,9 +9,7 @@ struct BrowserCommands: Commands {
     @Environment(\.openWindow) private var openWindow
 
     /// Commands act on the key window, which may be a private one.
-    private var browser: Browser { keyWindowBrowser ?? focusedBrowser ?? mainBrowser }
-
-    private var keyWindowBrowser: Browser? { NSApp.keyWindow.flatMap(Browser.showing) }
+    private var browser: Browser { focusedBrowser ?? mainBrowser }
 
     private var activeTab: Tab? { browser.activeTab }
 
@@ -42,8 +40,8 @@ struct BrowserCommands: Commands {
             Divider()
             // Replacing the system "Close" item also took ⌘W from Settings and other windows.
             Button(activeTab?.isPinned == true ? "Reset Pinned Tab" : "Close Tab") {
-                if let keyWindowBrowser {
-                    keyWindowBrowser.closeActiveTab()
+                if let focusedBrowser {
+                    focusedBrowser.closeActiveTab()
                 } else {
                     NSApp.keyWindow?.performClose(nil)
                 }

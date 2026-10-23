@@ -6,7 +6,7 @@ struct BrowserWindow: View {
     @AppStorage("sidebarWidth") private var sidebarWidth = Theme.defaultSidebarWidth
     @State private var isPeekingSidebar = false
     @State private var peekTask: Task<Void, Never>?
-    @State private var controlShortcutMonitor: Any?
+    @State private var shortcutMonitor: Any?
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
@@ -59,7 +59,7 @@ struct BrowserWindow: View {
         .animation(.easeOut(duration: 0.15), value: browser.commandBar)
         .animation(.snappy, value: browser.toast)
         .animation(.snappy(duration: 0.2), value: browser.isFindBarVisible)
-        .onAppear(perform: installControlShortcutMonitor)
+        .onAppear(perform: installShortcutMonitor)
         .sheet(isPresented: Bindable(browser).isClearBrowsingDataPresented) {
             ClearBrowsingDataView()
                 .environment(browser)
@@ -159,9 +159,11 @@ struct BrowserWindow: View {
     }
 
     /// ⌃⇥ and ⌃1…⌃9 never reach the menu: the key view loop and WKWebView consume them first.
-    private func installControlShortcutMonitor() {
-        guard controlShortcutMonitor == nil else { return }
-        controlShortcutMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { event in
+    /// ⌘W may not either: SwiftUI gives it to the system "Close" item or to "Close Tab"
+    /// depending on the build, and "Close" closes the window.
+    private func installShortcutMonitor() {
+        guard shortcutMonitor == nil else { return }
+        shortcutMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { event in
             // Every browser window installs a monitor; only the one the key press went to acts.
             guard event.window === browser.window else { return event }
             let modifiers = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
@@ -171,6 +173,10 @@ struct BrowserWindow: View {
             }
             if modifiers == .control, let number = event.charactersIgnoringModifiers.flatMap(Int.init), (1...9).contains(number) {
                 browser.selectSpace(number: number)
+                return nil
+            }
+            if modifiers == .command, event.charactersIgnoringModifiers == "w" {
+                browser.closeActiveTab()
                 return nil
             }
             return event
