@@ -20,6 +20,22 @@ struct SpacesTests {
         #expect(space.theme != browser.spaces[0].theme)
     }
 
+    @Test func movingSpaceKeepsItActiveAndRenumbersShortcuts() {
+        let browser = Browser()
+        let home = browser.activeSpace
+        let work = browser.createSpace()
+        let play = browser.createSpace()
+
+        browser.moveSpace(play, to: 0)
+        #expect(browser.spaces.map(\.id) == [play.id, home.id, work.id])
+        #expect(browser.activeSpace === play)
+
+        browser.moveSpace(play, to: 10)
+        #expect(browser.spaces.map(\.id) == [home.id, work.id, play.id])
+        browser.selectSpace(number: 1)
+        #expect(browser.activeSpace === home)
+    }
+
     @Test func eachSpaceRemembersItsActiveTab() {
         let browser = Browser()
         let home = browser.activeSpace

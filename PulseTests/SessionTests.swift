@@ -48,13 +48,16 @@ struct SessionTests {
         let work = browser.createSpace()
         browser.rename(work, to: "Work")
         browser.setTheme(.green, for: work)
+        browser.setIcon("💼", for: work)
         browser.openTab(url: URL(string: "https://b.com")!)
+        browser.moveSpace(work, to: 0)
         browser.saveSession()
 
         let restored = Browser(sessionStore: store)
         #expect(restored.session == browser.session)
-        #expect(restored.spaces.map(\.name) == ["Home", "Work"])
+        #expect(restored.spaces.map(\.name) == ["Work", "Home"])
         #expect(restored.activeSpace.theme == .green)
+        #expect(restored.activeSpace.icon == "💼")
         #expect(restored.activeTab?.url == URL(string: "https://b.com")!)
         #expect(restored.favorites.map(\.url) == [URL(string: "https://a.com")!])
 

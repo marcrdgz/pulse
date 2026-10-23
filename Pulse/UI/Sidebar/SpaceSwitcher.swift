@@ -34,18 +34,17 @@ struct SpaceSwitcher: View {
 
 struct SpaceDot: View {
     @Environment(Browser.self) private var browser
-    /// Absent in the collapsed sidebar, which has no tab dragging.
+    /// Absent in the collapsed sidebar, which has no tab or space dragging.
     @Environment(SidebarDragController.self) private var dragController: SidebarDragController?
+    @GestureState private var isReordering = false
     let space: Space
     let isActive: Bool
 
     var body: some View {
         let isHovered = dragController?.hoveredSpaceID == space.id
-        let isProminent = isActive || isHovered
+        let isProminent = isActive || isHovered || dragController?.draggedSpaceID == space.id
         Button { browser.selectSpace(space) } label: {
-            Circle()
-                .fill(Theme.swatch(space.theme))
-                .frame(width: isProminent ? 10 : 7, height: isProminent ? 10 : 7)
+            SpaceIcon(space: space, size: isProminent ? 10 : 7)
                 .opacity(isProminent ? 1 : 0.55)
                 .frame(width: 22, height: 22)
                 .contentShape(Rectangle())
@@ -53,6 +52,14 @@ struct SpaceDot: View {
         .buttonStyle(.plain)
         .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { frame in
             dragController?.spaceDotFrames[space.id] = frame
+        }
+        .simultaneousGesture(
+            DragGesture(minimumDistance: 4, coordinateSpace: .global)
+                .updating($isReordering) { _, isActive, _ in isActive = true }
+                .onChanged { dragController?.drag(space, to: $0.location, in: browser) }
+        )
+        .onChange(of: isReordering) {
+            if !isReordering { dragController?.endSpaceDrag() }
         }
         // Above the dot and starting at its leading edge, so it covers no other dot and stays in the window.
         .overlay(alignment: .bottomLeading) {
@@ -78,7 +85,38 @@ struct SpaceDot: View {
         .animation(.snappy(duration: 0.15), value: isHovered)
         .accessibilityLabel(space.name)
         .accessibilityAddTraits(isActive ? .isSelected : [])
-        .contextMenu { SpaceContextMenu(space: space) }
+        // Only in the full sidebar: while it peeks over the collapsed rail, both show this dot.
+        .popover(isPresented: isIconPickerPresented, arrowEdge: .top) {
+            SpaceIconPicker(space: space)
+                .environment(browser)
+        }
+        .contextMenu { SpaceContextMenu(space: space, canChangeIcon: dragController != nil) }
+    }
+
+    private var isIconPickerPresented: Binding<Bool> {
+        Binding(
+            get: { dragController != nil && browser.editingIconSpaceID == space.id },
+            set: { if !$0 { browser.endEditingIcon() } }
+        )
+    }
+}
+
+/// A space's emoji, or its color dot when it has none.
+struct SpaceIcon: View {
+    let space: Space
+    /// The dot's diameter; an emoji is drawn a little larger to read at the same weight.
+    let size: CGFloat
+
+    var body: some View {
+        if let icon = space.icon {
+            Text(icon)
+                .font(.system(size: size + 4))
+                .fixedSize()
+        } else {
+            Circle()
+                .fill(Theme.swatch(space.theme))
+                .frame(width: size, height: size)
+        }
     }
 }
 

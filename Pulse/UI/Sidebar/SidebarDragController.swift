@@ -31,7 +31,24 @@ final class SidebarDragController {
     @ObservationIgnored var spaceSwitcherFrame: CGRect?
     @ObservationIgnored var spaceDotFrames: [Space.ID: CGRect] = [:]
 
+    /// The space whose dot is being dragged along the switcher to reorder it.
+    private(set) var draggedSpaceID: Space.ID?
+
     var isDragging: Bool { draggedTabID != nil }
+
+    /// Reorders live, like tabs within a section: the dot takes the slot of the dots the pointer passed.
+    func drag(_ space: Space, to location: CGPoint, in browser: Browser) {
+        draggedSpaceID = space.id
+        let index = browser.spaces.filter { other in
+            other.id != space.id && (spaceDotFrames[other.id]?.midX ?? .infinity) < location.x
+        }.count
+        withAnimation(.snappy(duration: 0.2)) { browser.moveSpace(space, to: index) }
+    }
+
+    /// Also called when the gesture is cancelled.
+    func endSpaceDrag() {
+        draggedSpaceID = nil
+    }
 
     func drag(_ tab: Tab, to location: CGPoint, in browser: Browser) {
         if draggedTabID != tab.id {

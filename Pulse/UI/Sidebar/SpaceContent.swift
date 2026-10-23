@@ -92,9 +92,12 @@ private struct SpaceHeader: View {
 
     var body: some View {
         HStack(spacing: 8) {
-            Circle()
-                .fill(Theme.swatch(space.theme))
-                .frame(width: 8, height: 8)
+            // The picker opens from the space's dot below, as in Arc.
+            SpaceIcon(space: space, size: 8)
+                .frame(width: 14, height: 14)
+                .contentShape(Rectangle())
+                .onTapGesture { browser.beginEditingIcon(of: space) }
+                .help("Change Icon")
             if isRenaming {
                 TextField("Space Name", text: $draftName)
                     .textFieldStyle(.plain)
@@ -132,9 +135,17 @@ private struct SpaceHeader: View {
 struct SpaceContextMenu: View {
     @Environment(Browser.self) private var browser
     let space: Space
+    /// The collapsed rail has no icon picker to open.
+    var canChangeIcon = true
 
     var body: some View {
         Button("Rename Space…") { browser.beginRenaming(space) }
+        if canChangeIcon {
+            Button("Change Icon…") { browser.beginEditingIcon(of: space) }
+        }
+        if space.icon != nil {
+            Button("Remove Icon") { browser.setIcon(nil, for: space) }
+        }
         Picker("Color", selection: Binding(get: { space.theme }, set: { browser.setTheme($0, for: space) })) {
             ForEach(SpaceTheme.allCases, id: \.self) { theme in
                 Text(theme.displayName).tag(theme)

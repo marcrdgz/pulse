@@ -16,6 +16,7 @@ struct Session: Codable, Equatable {
         var name: String
         /// Raw `SpaceTheme`; unknown values fall back to the default theme.
         var theme: String
+        var icon: String? = nil
         var pinnedTabs: [SavedTab]
         var todayTabs: [SavedTab]
         var activeTabID: UUID?

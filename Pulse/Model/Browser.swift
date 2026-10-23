@@ -44,6 +44,8 @@ final class Browser: NSObject {
     private(set) var isFindQueryMissing = false
     /// The space whose name is being edited in the sidebar.
     private(set) var renamingSpaceID: Space.ID?
+    /// The space whose icon picker is open in the sidebar.
+    private(set) var editingIconSpaceID: Space.ID?
     var isClearBrowsingDataPresented = false
     /// Shown on the very first launch, before any session exists.
     var isOnboardingPresented = false
@@ -652,6 +654,30 @@ final class Browser: NSObject {
         scheduleSave()
     }
 
+    func beginEditingIcon(of space: Space) {
+        editingIconSpaceID = space.id
+    }
+
+    func endEditingIcon() {
+        editingIconSpaceID = nil
+    }
+
+    /// `nil` brings back the color dot.
+    func setIcon(_ icon: String?, for space: Space) {
+        space.icon = icon
+        scheduleSave()
+    }
+
+    /// Moves the space to `index` in the switcher, which also renumbers the ⌃1–⌃9 shortcuts.
+    func moveSpace(_ space: Space, to index: Int) {
+        guard let source = spaces.firstIndex(where: { $0.id == space.id }) else { return }
+        let destination = min(max(index, 0), spaces.count - 1)
+        guard destination != source else { return }
+        spaces.remove(at: source)
+        spaces.insert(space, at: destination)
+        scheduleSave()
+    }
+
     /// Closes the space's pinned and today tabs; favorites stay. The last space can't be deleted.
     func delete(_ space: Space) {
         guard spaces.count > 1, let index = spaces.firstIndex(where: { $0.id == space.id }) else { return }
@@ -776,6 +802,7 @@ final class Browser: NSObject {
                     id: space.id,
                     name: space.name,
                     theme: space.theme.rawValue,
+                    icon: space.icon,
                     pinnedTabs: space.pinnedTabs.map(Session.SavedTab.init),
                     todayTabs: space.todayTabs.map(Session.SavedTab.init),
                     activeTabID: space.activeTabID
@@ -816,6 +843,7 @@ final class Browser: NSObject {
                 id: saved.id,
                 name: saved.name,
                 theme: SpaceTheme(rawValue: saved.theme) ?? .purple,
+                icon: saved.icon,
                 pinnedTabs: saved.pinnedTabs.map(makeTab),
                 todayTabs: saved.todayTabs.map(makeTab),
                 activeTabID: saved.activeTabID

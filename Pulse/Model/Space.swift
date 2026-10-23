@@ -14,6 +14,8 @@ final class Space: Identifiable {
     let id: UUID
     var name: String
     var theme: SpaceTheme
+    /// An emoji shown instead of the color dot.
+    var icon: String?
     var pinnedTabs: [Tab]
     /// Newest first, like Arc's "Today" section.
     var todayTabs: [Tab]
@@ -24,6 +26,7 @@ final class Space: Identifiable {
         id: UUID = UUID(),
         name: String,
         theme: SpaceTheme,
+        icon: String? = nil,
         pinnedTabs: [Tab] = [],
         todayTabs: [Tab] = [],
         activeTabID: Tab.ID? = nil
@@ -31,6 +34,7 @@ final class Space: Identifiable {
         self.id = id
         self.name = name
         self.theme = theme
+        self.icon = icon
         self.pinnedTabs = pinnedTabs
         self.todayTabs = todayTabs
         self.activeTabID = activeTabID
