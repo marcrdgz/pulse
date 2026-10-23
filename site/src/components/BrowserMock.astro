@@ -1,0 +1,94 @@
+---
+// Stylized stand-in for a screenshot until real captures of the app exist.
+const today = ['GitHub — marcrdgz/pulse', 'WebKit Blog', 'Hacker News', 'Apple Developer'];
+---
+
+<div class="mock" aria-hidden="true">
+  <aside class="mock-sidebar">
+    <div class="mock-traffic"><i></i><i></i><i></i></div>
+    <div class="mock-url">github.com/marcrdgz/pulse</div>
+    <div class="mock-favorites">
+      {Array.from({ length: 4 }, () => <span></span>)}
+    </div>
+    <p class="mock-label">Today</p>
+    <ul class="mock-tabs">
+      {today.map((tab, i) => <li class={i === 0 ? 'active' : undefined}>{tab}</li>)}
+    </ul>
+    <div class="mock-spaces"><i class="on"></i><i></i><i></i></div>
+  </aside>
+  <div class="mock-page">
+    <div class="mock-line wide"></div>
+    <div class="mock-line"></div>
+    <div class="mock-block"></div>
+    <div class="mock-line"></div>
+    <div class="mock-line short"></div>
+  </div>
+</div>
+
+<style>
+  .mock {
+    display: grid;
+    grid-template-columns: 220px 1fr;
+    gap: 10px;
+    padding: 10px;
+    border-radius: 18px;
+    background: linear-gradient(135deg, #ff9a3d33, #e0307a33 40%, #7b4dff44);
+    border: 1px solid var(--border);
+    box-shadow: 0 30px 80px -30px #2a1b6b66;
+    aspect-ratio: 16 / 10;
+    text-align: left;
+    width: 100%;
+  }
+  .mock-sidebar {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    padding: 6px 4px;
+    min-width: 0;
+  }
+  .mock-traffic { display: flex; gap: 6px; }
+  .mock-traffic i { width: 10px; height: 10px; border-radius: 50%; background: #ff5f57; }
+  .mock-traffic i:nth-child(2) { background: #febc2e; }
+  .mock-traffic i:nth-child(3) { background: #28c840; }
+  .mock-url {
+    font-size: 12px;
+    padding: 6px 10px;
+    border-radius: 8px;
+    background: var(--mock-chip);
+    color: var(--muted);
+  }
+  .mock-favorites { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+  .mock-favorites span { aspect-ratio: 1; border-radius: 8px; background: var(--mock-chip); }
+  .mock-label { margin: 4px 0 0; font-size: 11px; color: var(--muted); }
+  .mock-tabs { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
+  .mock-tabs li {
+    font-size: 12px;
+    padding: 6px 10px;
+    border-radius: 8px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .mock-tabs li.active { background: var(--surface); box-shadow: 0 1px 2px #0002; }
+  .mock-spaces { margin-top: auto; display: flex; justify-content: center; gap: 8px; }
+  .mock-spaces i { width: 7px; height: 7px; border-radius: 50%; background: var(--muted); opacity: 0.4; }
+  .mock-spaces i.on { opacity: 1; background: var(--text); }
+  .mock-page {
+    border-radius: 10px;
+    background: var(--surface);
+    box-shadow: 0 1px 3px #0002;
+    padding: 28px;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+  }
+  .mock-line { height: 10px; width: 70%; border-radius: 5px; background: var(--mock-chip); }
+  .mock-line.wide { width: 45%; height: 18px; }
+  .mock-line.short { width: 40%; }
+  .mock-block { flex: 1; border-radius: 8px; background: var(--mock-chip); }
+
+  @media (max-width: 640px) {
+    .mock { grid-template-columns: 1fr; aspect-ratio: auto; }
+    .mock-page { display: none; }
+  }
+</style>

@@ -1,0 +1,89 @@
+---
+import Base from '../layouts/Base.astro';
+import BrowserMock from '../components/BrowserMock.astro';
+
+const base = import.meta.env.BASE_URL.replace(/\/$/, '');
+
+const features = [
+  {
+    title: 'Spaces',
+    body: 'Separate sidebars with their own color, pinned and Today tabs. Favorites are shared. Switch with ⌃1…⌃9, the dots or a two-finger swipe.',
+  },
+  {
+    title: 'Command bar',
+    body: "⌘T or ⌘L opens an address bar that completes the sites you visit often, ranked by frequency and recency, alongside open tabs and suggestions.",
+  },
+  {
+    title: 'Native WebKit',
+    body: 'A real macOS app built in Swift on WebKit. No Chromium, no Electron.',
+  },
+  {
+    title: 'Keyboard-first',
+    body: 'Every common action has a shortcut, from pinning tabs to reopening closed ones, find in page and the Web Inspector.',
+  },
+  {
+    title: 'Easy switch from Chrome',
+    body: 'First launch imports your Chrome history and bookmarks bar and offers to make Pulse the default browser.',
+  },
+  {
+    title: 'The details you expect',
+    body: 'Session restore with lazy tabs, a downloads bubble with pause and retry, history grouped by day and per-site camera and microphone permissions.',
+  },
+];
+
+const shortcuts = [
+  ['⌘T', 'New tab'],
+  ['⌘L', 'Edit current URL'],
+  ['⌘D', 'Pin or unpin tab'],
+  ['⌃1…⌃9', 'Switch space'],
+  ['⌘S', 'Toggle sidebar'],
+  ['⌘⇧T', 'Reopen closed tab'],
+];
+---
+
+<Base>
+  <section class="hero container">
+    <img class="hero-icon" src={`${base}/favicon.svg`} alt="" width="88" height="88" />
+    <h1>A calm, native browser for macOS</h1>
+    <p class="lede">
+      Pulse is built on WebKit, with Arc's look and a keyboard-first workflow. Spaces, a
+      sidebar for your tabs and a command bar that knows where you're going.
+    </p>
+    <div class="actions">
+      <a class="button primary" href={`${base}/download`}>Download for Mac</a>
+      <a class="button" href="https://github.com/marcrdgz/pulse">View on GitHub</a>
+    </div>
+    <p class="fine">Free and open source · macOS 14 or later</p>
+    <div class="hero-visual">
+      <BrowserMock />
+    </div>
+  </section>
+
+  <section id="features" class="container section">
+    <h2>Everything in its place</h2>
+    <div class="feature-grid">
+      {
+        features.map((feature) => (
+          <article class="card">
+            <h3>{feature.title}</h3>
+            <p>{feature.body}</p>
+          </article>
+        ))
+      }
+    </div>
+  </section>
+
+  <section class="container section">
+    <h2>Hands on the keyboard</h2>
+    <dl class="shortcuts">
+      {
+        shortcuts.map(([keys, action]) => (
+          <div>
+            <dt><kbd>{keys}</kbd></dt>
+            <dd>{action}</dd>
+          </div>
+        ))
+      }
+    </dl>
+  </section>
+</Base>

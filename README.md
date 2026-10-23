@@ -67,3 +67,13 @@ open Pulse.xcodeproj
 # or
 xcodebuild -project Pulse.xcodeproj -scheme Pulse -destination 'platform=macOS' test
 ```
+
+## Website
+
+The landing page lives in `site/` (Astro, Node 26) and deploys to GitHub Pages from `main`.
+
+```sh
+cd site
+npm install
+npm run dev
+```

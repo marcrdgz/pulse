@@ -1,0 +1,56 @@
+---
+import '../styles/global.css';
+
+interface Props {
+  title?: string;
+  description?: string;
+}
+
+const {
+  title,
+  description = "A native macOS browser built on WebKit, with Arc's look and keyboard-first workflow.",
+} = Astro.props;
+
+const base = import.meta.env.BASE_URL.replace(/\/$/, '');
+const pageTitle = title ? `${title} · Pulse` : 'Pulse — a native macOS browser';
+const repoUrl = 'https://github.com/marcrdgz/pulse';
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{pageTitle}</title>
+    <meta name="description" content={description} />
+    <meta property="og:title" content={pageTitle} />
+    <meta property="og:description" content={description} />
+    <link rel="icon" type="image/svg+xml" href={`${base}/favicon.svg`} />
+  </head>
+  <body>
+    <header class="site-header">
+      <nav class="container nav">
+        <a class="brand" href={`${base}/`}>
+          <img src={`${base}/favicon.svg`} alt="" width="28" height="28" />
+          Pulse
+        </a>
+        <div class="nav-links">
+          <a href={`${base}/#features`}>Features</a>
+          <a href={`${base}/download`}>Download</a>
+          <a href={repoUrl}>GitHub</a>
+        </div>
+      </nav>
+    </header>
+
+    <main>
+      <slot />
+    </main>
+
+    <footer class="site-footer">
+      <div class="container footer-inner">
+        <span>Pulse is free software under the AGPL-3.0.</span>
+        <a href={repoUrl}>Source on GitHub</a>
+      </div>
+    </footer>
+  </body>
+</html>
