@@ -1,20 +1,34 @@
 import AppKit
 import SwiftUI
 
+/// The Settings window's tabs; stored so other windows can open it on a given pane.
+enum SettingsPane: String {
+    case general, search, downloads, privacy, extensions
+
+    static let storageKey = "settingsPane"
+}
+
 /// ⌘, — the options Chrome has in chrome://settings that apply to Pulse, as a native window.
 struct SettingsView: View {
+    @AppStorage(SettingsPane.storageKey) private var pane = SettingsPane.general
+
     var body: some View {
-        TabView {
+        TabView(selection: $pane) {
             GeneralSettings()
                 .tabItem { Label("General", systemImage: "gearshape") }
+                .tag(SettingsPane.general)
             SearchSettings()
                 .tabItem { Label("Search", systemImage: "magnifyingglass") }
+                .tag(SettingsPane.search)
             DownloadSettings()
                 .tabItem { Label("Downloads", systemImage: "arrow.down.circle") }
+                .tag(SettingsPane.downloads)
             PrivacySettings()
                 .tabItem { Label("Privacy", systemImage: "hand.raised") }
+                .tag(SettingsPane.privacy)
             ExtensionSettings()
                 .tabItem { Label("Extensions", systemImage: "puzzlepiece.extension") }
+                .tag(SettingsPane.extensions)
         }
         .frame(width: 520)
     }

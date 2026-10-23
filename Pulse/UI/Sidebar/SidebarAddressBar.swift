@@ -4,6 +4,7 @@ import SwiftUI
 struct SidebarAddressBar: View {
     @Environment(Browser.self) private var browser
     @State private var isHovered = false
+    @State private var isShowingSiteControls = false
 
     var body: some View {
         let tab = browser.activeTab
@@ -23,6 +24,10 @@ struct SidebarAddressBar: View {
                         .font(.system(size: 11))
                         .opacity(0.5)
                         .help("Ads and trackers are allowed on this site")
+                }
+                if tab?.url.isWebPage == true {
+                    // Room for the site controls button, which sits over the pill rather than inside it.
+                    Color.clear.frame(width: 18)
                 }
             }
             .font(.system(size: 13))
@@ -54,6 +59,21 @@ struct SidebarAddressBar: View {
                     Button(isAllowingAds(on: tab) ? "Block Ads on \(site)" : "Allow Ads on \(site)") {
                         browser.toggleContentBlocking(on: tab)
                     }
+                }
+            }
+        }
+        .overlay(alignment: .trailing) {
+            if let tab, tab.url.isWebPage {
+                Button { isShowingSiteControls.toggle() } label: {
+                    Image(systemName: "slider.horizontal.3")
+                        .font(.system(size: 12))
+                        .opacity(0.7)
+                }
+                .buttonStyle(SidebarIconButtonStyle(size: 24))
+                .padding(.trailing, 4)
+                .help("Site Controls")
+                .popover(isPresented: $isShowingSiteControls, arrowEdge: .bottom) {
+                    SiteControls(tab: tab)
                 }
             }
         }

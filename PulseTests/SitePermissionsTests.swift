@@ -46,6 +46,25 @@ struct SitePermissionsTests {
         #expect(browser.activePermissionRequest?.kinds == [.camera, .microphone])
     }
 
+    @Test func siteControlsSwitchAnswersFutureRequests() {
+        let (browser, tab) = makeBrowser()
+        var decisions: [WKPermissionDecision] = []
+
+        browser.setPermission(false, for: .camera, on: tab)
+        browser.setPermission(true, for: .microphone, on: tab)
+        browser.requestPermission(from: tab, origin: "meet.google.com", kinds: [.camera]) { decisions.append($0) }
+        browser.requestPermission(from: tab, origin: "meet.google.com", kinds: [.microphone]) { decisions.append($0) }
+
+        #expect(decisions == [.deny, .grant])
+        #expect(browser.permissionRequests.isEmpty)
+    }
+
+    @Test func permissionOriginKeepsOnlyNonDefaultPorts() {
+        #expect(URL(string: "https://meet.google.com/abc")!.permissionOrigin == "meet.google.com")
+        #expect(URL(string: "https://example.com:443")!.permissionOrigin == "example.com")
+        #expect(URL(string: "http://localhost:3000/")!.permissionOrigin == "localhost:3000")
+    }
+
     @Test func closingTheTabDeniesItsPendingRequests() {
         let (browser, tab) = makeBrowser()
         var decisions: [WKPermissionDecision] = []

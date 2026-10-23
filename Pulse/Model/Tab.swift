@@ -81,6 +81,15 @@ final class Tab: NSObject, Identifiable {
         browser?.extensions?.controller.didChangeTabProperties(.muted, for: self)
     }
 
+    /// Ends a capture the page already started, which revoking the permission alone wouldn't.
+    func stopCapture(_ kind: PermissionKind) {
+        guard let loadedWebView else { return }
+        switch kind {
+        case .camera: loadedWebView.setCameraCaptureState(.none, completionHandler: nil)
+        case .microphone: loadedWebView.setMicrophoneCaptureState(.none, completionHandler: nil)
+        }
+    }
+
     var displayTitle: String {
         customTitle ?? internalPage?.title ?? (title.isEmpty ? (url.displayHost ?? "New Tab") : title)
     }

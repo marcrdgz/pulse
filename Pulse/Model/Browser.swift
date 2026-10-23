@@ -391,6 +391,19 @@ final class Browser: NSObject {
         }
     }
 
+    /// Removes the cookies and storage of the tab's site (signing the user out) and reloads it.
+    func clearSiteData(for tab: Tab) async {
+        guard let host = tab.url.host(), let site = tab.url.displayHost else { return }
+        let types = WKWebsiteDataStore.allWebsiteDataTypes()
+        // Records are named by registrable domain, e.g. `google.com` for `mail.google.com`.
+        let records = await websiteDataStore.dataRecords(ofTypes: types).filter {
+            host == $0.displayName || host.hasSuffix("." + $0.displayName)
+        }
+        await websiteDataStore.removeData(ofTypes: types, for: records)
+        tab.reload()
+        showToast("Cleared Data for \(site)")
+    }
+
     // MARK: History
 
     /// On commit the tab still has the previous page's title; the new one arrives through
@@ -546,6 +559,15 @@ final class Browser: NSObject {
             sitePermissions?.save(false, for: request.origin, kinds: request.kinds)
             request.respond(.deny)
         }
+    }
+
+    /// The site controls' switch: remembered like the prompt's "Allow while visiting the site" or
+    /// "Never allow", and turning it off also stops the camera or microphone if the page is using it.
+    func setPermission(_ isAllowed: Bool, for kind: PermissionKind, on tab: Tab) {
+        if let origin = tab.url.permissionOrigin {
+            sitePermissions?.setDecision(isAllowed, for: origin, kind: kind)
+        }
+        if !isAllowed { tab.stopCapture(kind) }
     }
 
     private func denyPermissionRequests(from tab: Tab) {

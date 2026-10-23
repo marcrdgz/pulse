@@ -76,6 +76,15 @@ struct SitePermissionStore {
     }
 }
 
+extension URL {
+    /// The site a page's permissions are remembered under, named like `WKSecurityOrigin.displayName`.
+    var permissionOrigin: String? {
+        guard let host = host(), !host.isEmpty else { return nil }
+        guard let port, !(scheme == "https" && port == 443), !(scheme == "http" && port == 80) else { return host }
+        return "\(host):\(port)"
+    }
+}
+
 extension WKSecurityOrigin {
     /// Host plus a non-default port, the way Chrome names a site in its prompts.
     var displayName: String {
