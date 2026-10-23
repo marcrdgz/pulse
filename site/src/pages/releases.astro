@@ -1,0 +1,280 @@
+---
+import Base from '../layouts/Base.astro';
+import Keys from '../components/Keys.astro';
+import Mark from '../components/Mark.astro';
+// The same notes Pulse shows in What's New; the `/release` skill writes them, newest first.
+import releases from '../../../Pulse/Resources/ReleaseNotes.json';
+
+// Dates are calendar days, so format them in UTC to keep them from shifting a day.
+const formatDate = (day: string) =>
+  new Intl.DateTimeFormat('en-US', { dateStyle: 'long', timeZone: 'UTC' }).format(new Date(day));
+const withoutPeriod = (text: string) => text.replace(/\.$/, '');
+---
+
+<Base title="Release notes" description="What changed in each version of Pulse.">
+  <section class="container releases-intro">
+    <h1>Release notes<span class="flare">.</span></h1>
+    <p class="lede">
+      What changed in each version of Pulse. The app shows the same notes the first time you open a new
+      version.
+    </p>
+  </section>
+
+  <ol class="container releases">
+    {
+      releases.map((release, index) => (
+        <li class="release" id={`v${release.version}`}>
+          <div class="release-meta">
+            {index === 0 ? <Mark size={30} class="marker" /> : <span class="marker ring" aria-hidden="true" />}
+            <div>
+              <a class="version" href={`#v${release.version}`}>
+                {release.version}
+              </a>
+              <time datetime={release.date}>{formatDate(release.date)}</time>
+              {index === 0 && <span class="note latest">latest</span>}
+            </div>
+          </div>
+
+          <div class="release-body">
+            <h2>
+              {withoutPeriod(release.summary)}
+              <span class="flare">.</span>
+            </h2>
+
+            {release.highlights.length > 0 && (
+              <ul class="highlights">
+                {release.highlights.map((highlight) => (
+                  <li>
+                    <div class="highlight-head">
+                      <h3>{highlight.title}</h3>
+                      {'shortcut' in highlight && highlight.shortcut && <Keys combos={[highlight.shortcut]} />}
+                    </div>
+                    <p>{highlight.body}</p>
+                  </li>
+                ))}
+              </ul>
+            )}
+
+            <div class="changes">
+              {release.improvements.length > 0 && (
+                <section>
+                  <h3>Also new</h3>
+                  <ul>
+                    {release.improvements.map((item) => (
+                      <li>{item}</li>
+                    ))}
+                  </ul>
+                </section>
+              )}
+              {release.fixes.length > 0 && (
+                <section>
+                  <h3>Fixed</h3>
+                  <ul>
+                    {release.fixes.map((item) => (
+                      <li>{item}</li>
+                    ))}
+                  </ul>
+                </section>
+              )}
+            </div>
+          </div>
+        </li>
+      ))
+    }
+  </ol>
+</Base>
+
+<style>
+  .releases-intro {
+    padding-block: 96px 72px;
+  }
+
+  .releases-intro h1 {
+    margin-bottom: 20px;
+    font-size: clamp(2.6rem, 7vw, 4.4rem);
+  }
+
+  .releases {
+    margin: 0 auto;
+    padding-bottom: 144px;
+    list-style: none;
+  }
+
+  /* Each release is a stop on a timeline: a ring on a rail, the latest one the Halo mark itself. */
+  .release {
+    --marker: 30px;
+    position: relative;
+    display: grid;
+    grid-template-columns: 220px minmax(0, 1fr);
+    gap: 48px;
+    padding-bottom: 112px;
+    scroll-margin-top: 96px;
+  }
+
+  .release::before {
+    content: '';
+    position: absolute;
+    top: calc(var(--marker) / 2);
+    bottom: 0;
+    left: calc(var(--marker) / 2 - 1px);
+    width: 2px;
+    background: var(--line);
+  }
+
+  .release:last-child {
+    padding-bottom: 0;
+  }
+
+  .release:last-child::before {
+    display: none;
+  }
+
+  .release-meta {
+    position: sticky;
+    top: 96px;
+    align-self: start;
+    display: grid;
+    grid-template-columns: var(--marker) 1fr;
+    gap: 14px;
+  }
+
+  .marker {
+    position: relative;
+    display: block;
+    width: var(--marker);
+    height: var(--marker);
+    background: var(--paper);
+  }
+
+  .marker :global(img) {
+    display: block;
+  }
+
+  .ring {
+    border: 3px solid var(--line);
+    border-radius: 50%;
+  }
+
+  .version {
+    display: block;
+    font-size: 1.5rem;
+    font-weight: 700;
+    line-height: var(--marker);
+    letter-spacing: -0.02em;
+    font-variant-numeric: tabular-nums;
+    text-decoration: none;
+  }
+
+  .version:hover {
+    text-decoration: underline;
+    text-underline-offset: 4px;
+  }
+
+  time {
+    display: block;
+    font-size: 15px;
+    color: var(--dim);
+  }
+
+  .latest {
+    display: inline-block;
+    margin-top: 10px;
+    transform: rotate(-4deg);
+  }
+
+  .release-body {
+    max-width: 720px;
+  }
+
+  .release-body h2 {
+    font-size: clamp(2rem, 4.4vw, 3rem);
+    text-wrap: balance;
+  }
+
+  .highlights {
+    display: grid;
+    gap: 32px;
+    margin: 48px 0 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .highlight-head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px 16px;
+  }
+
+  .highlight-head h3 {
+    font-size: 1.3rem;
+  }
+
+  .highlights p {
+    margin: 8px 0 0;
+    max-width: 60ch;
+    color: var(--dim);
+  }
+
+  .changes {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr));
+    gap: 32px 48px;
+    margin-top: 56px;
+    padding-top: 40px;
+    border-top: 1px solid var(--line);
+  }
+
+  .changes:empty {
+    display: none;
+  }
+
+  .changes h3 {
+    margin-bottom: 14px;
+    font-size: 1.05rem;
+  }
+
+  .changes ul {
+    display: grid;
+    gap: 10px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    font-size: 15px;
+    line-height: 1.5;
+  }
+
+  .changes li {
+    position: relative;
+    padding-left: 18px;
+  }
+
+  .changes li::before {
+    content: '';
+    position: absolute;
+    top: 0.62em;
+    left: 0;
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--flare);
+  }
+
+  /* One column: the version sits above its notes and the rail goes. */
+  @media (max-width: 860px) {
+    .release {
+      grid-template-columns: minmax(0, 1fr);
+      gap: 24px;
+      padding-bottom: 88px;
+    }
+
+    .release::before {
+      display: none;
+    }
+
+    .release-meta {
+      position: static;
+    }
+  }
+</style>

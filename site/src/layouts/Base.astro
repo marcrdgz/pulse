@@ -47,6 +47,7 @@ const ogImage = new URL(`${base}/brand/og-dark.png`, Astro.site);
           <a href={`${base}/#features`}>Features</a>
           <a href={`${base}/#security`}>Security</a>
           <a href={`${base}/#shortcuts`}>Shortcuts</a>
+          <a href={`${base}/releases`}>Release notes</a>
           <a href={repoUrl}>GitHub</a>
           <a class="nav-download" href={`${base}/download`}>Download</a>
         </div>
@@ -63,7 +64,10 @@ const ogImage = new URL(`${base}/brand/og-dark.png`, Astro.site);
           <Mark variant="mono" size={20} />
           Pulse is free software under the AGPL-3.0.
         </span>
-        <a href={repoUrl}>Source on GitHub</a>
+        <span class="footer-links">
+          <a href={`${base}/releases`}>Release notes</a>
+          <a href={repoUrl}>Source on GitHub</a>
+        </span>
       </div>
     </footer>
   </body>

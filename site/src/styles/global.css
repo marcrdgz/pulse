@@ -219,6 +219,11 @@ h3 {
   gap: 10px;
 }
 
+.footer-links {
+  display: flex;
+  gap: 22px;
+}
+
 .footer-brand img {
   display: block;
 }
