@@ -3,7 +3,8 @@ import SwiftUI
 
 struct SidebarView: View {
     @Environment(Browser.self) private var browser
-    @State private var dragController = SidebarDragController()
+    /// Owned by the window: the page takes tabs dropped on it, and the ghost is drawn above it.
+    @Environment(SidebarDragController.self) private var dragController
     @State private var swipeTracker = SpaceSwipeTracker()
     @State private var frame: CGRect = .zero
     @State private var eventMonitors: [Any] = []
@@ -23,9 +24,7 @@ struct SidebarView: View {
         .padding(.horizontal, 10)
         .padding(.bottom, 6)
         .foregroundStyle(Theme.sidebarText)
-        .overlay(alignment: .topLeading) { dragGhost }
         .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { frame = $0 }
-        .environment(dragController)
         .animation(.snappy(duration: 0.22), value: browser.favorites.isEmpty)
         .animation(.snappy(duration: 0.22), value: dragController.isDragging)
         .onAppear(perform: installEventMonitors)
@@ -48,18 +47,6 @@ struct SidebarView: View {
             .animation(reduceMotion ? nil : .snappy(duration: 0.3), value: browser.activeSpaceID)
         }
         .clipped()
-    }
-
-    @ViewBuilder private var dragGhost: some View {
-        if let tabID = dragController.draggedTabID,
-           let tab = browser.allTabs.first(where: { $0.id == tabID }),
-           let size = dragController.tabFrames[tabID]?.size {
-            SidebarDragGhost(tab: tab, isTile: browser.position(of: tab)?.section == .favorites, size: size)
-                .offset(
-                    x: dragController.location.x - dragController.grabOffset.width - size.width / 2 - frame.minX,
-                    y: dragController.location.y - dragController.grabOffset.height - size.height / 2 - frame.minY
-                )
-        }
     }
 
     /// Events SwiftUI has no gestures for: middle-click closes the tab under the pointer,

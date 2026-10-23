@@ -213,13 +213,26 @@ final class Browser: NSObject {
         return space.contains(other)
     }
 
-    /// Shows `other` next to `tab` and focuses it; either leaves the split it was in.
-    func splitView(_ tab: Tab, with other: Tab) {
+    /// Shows `other` on `side` of `tab` and focuses it; either leaves the split it was in.
+    /// Replacing a pane keeps the split's widths.
+    func splitView(_ tab: Tab, with other: Tab, on side: SplitSide = .trailing) {
         guard canSplit(tab, with: other), let space = space(containing: tab) else { return }
+        let ratio = space.split(containing: tab.id)?.ratio ?? 0.5
         separate(tab)
         separate(other)
-        space.splits.append(TabSplit(leading: tab.id, trailing: other.id))
+        let (leading, trailing) = side == .trailing ? (tab, other) : (other, tab)
+        space.splits.append(TabSplit(leading: leading.id, trailing: trailing.id, ratio: ratio))
         select(other)
+    }
+
+    /// The tab that stays on screen when `tab` is dragged onto `side` of the page: the other pane
+    /// of a split view, or the page shown. `nil` when the drop can't split.
+    func tabKept(droppingTab tab: Tab, on side: SplitSide) -> Tab? {
+        let shown = visibleTabs
+        guard !shown.contains(tab) else { return nil }
+        let kept = shown.count == 2 ? (side == .leading ? shown[1] : shown[0]) : activeTab
+        guard let kept, canSplit(kept, with: tab) else { return nil }
+        return kept
     }
 
     /// Both tabs stay open as separate rows.

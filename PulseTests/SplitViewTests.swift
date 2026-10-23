@@ -70,6 +70,30 @@ struct SplitViewTests {
         #expect(browser.activeSpace.splits == [TabSplit(leading: c.id, trailing: b.id)])
     }
 
+    @Test func droppingATabOnThePageSplitsOnThatSide() throws {
+        let browser = makeBrowser("a", "b")
+        let (b, a) = (browser.todayTabs[0], browser.todayTabs[1])
+        #expect(browser.tabKept(droppingTab: b, on: .leading) == nil, "the page shown can't split with itself")
+
+        let kept = try #require(browser.tabKept(droppingTab: a, on: .leading))
+        browser.splitView(kept, with: a, on: .leading)
+        #expect(hosts(browser.visibleTabs) == ["a", "b"])
+        #expect(browser.activeTab === a)
+    }
+
+    @Test func droppingOnASplitReplacesThatPaneAndKeepsTheWidths() {
+        let browser = makeBrowser("a", "b", "c")
+        let (c, b, a) = (browser.todayTabs[0], browser.todayTabs[1], browser.todayTabs[2])
+        browser.splitView(a, with: b)
+        browser.setSplitRatio(0.3)
+
+        #expect(browser.tabKept(droppingTab: c, on: .trailing) === a)
+        browser.splitView(a, with: c, on: .trailing)
+        #expect(hosts(browser.visibleTabs) == ["a", "c"])
+        #expect(browser.activeSplit?.ratio == 0.3)
+        #expect(browser.tabKept(droppingTab: a, on: .trailing) == nil)
+    }
+
     @Test func commandBarOpensThePageNextToTheActiveTab() {
         let browser = makeBrowser("a")
         browser.showCommandBar(.splitView)

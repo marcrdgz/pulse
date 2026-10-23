@@ -7,6 +7,8 @@ struct BrowserWindow: View {
     @State private var isPeekingSidebar = false
     @State private var peekTask: Task<Void, Never>?
     @State private var shortcutMonitor: Any?
+    /// Shared by the sidebar and the page, which takes tabs dragged onto it into a split view.
+    @State private var dragController = SidebarDragController()
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
@@ -21,6 +23,7 @@ struct BrowserWindow: View {
             HStack(spacing: 0) {
                 if browser.isSidebarExpanded {
                     SidebarView()
+                        .environment(dragController)
                         .frame(width: sidebarWidth)
                         .overlay(alignment: .trailing) {
                             SidebarResizeHandle(width: $sidebarWidth)
@@ -37,6 +40,10 @@ struct BrowserWindow: View {
             if isPeekingSidebar {
                 sidebarPeek
             }
+
+            // Above the page's web views, which would otherwise hide it.
+            DragGhostLayer()
+                .environment(dragController)
 
             if let mode = browser.commandBar {
                 commandBar(mode)
@@ -99,6 +106,11 @@ struct BrowserWindow: View {
                 }
             }
         }
+        .overlay {
+            SplitDropPreview()
+                .environment(dragController)
+        }
+        .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { dragController.contentFrame = $0 }
         .padding(.vertical, Theme.contentInset)
         .padding(.trailing, Theme.contentInset)
     }
@@ -173,6 +185,7 @@ struct BrowserWindow: View {
     /// Hovering the collapsed rail slides the full sidebar in over the page, like Arc.
     private var sidebarPeek: some View {
         SidebarView()
+            .environment(dragController)
             .frame(width: sidebarWidth)
             .background(Theme.sidebarGradient(browser.activeSpace.theme))
             .clipShape(RoundedRectangle(cornerRadius: Theme.contentCornerRadius, style: .continuous))
@@ -333,6 +346,92 @@ private struct WindowChrome: NSViewRepresentable {
             for button in [NSWindow.ButtonType.closeButton, .miniaturizeButton, .zoomButton] {
                 window.standardWindowButton(button)?.isHidden = !showsTrafficLights
             }
+        }
+    }
+}
+
+/// The tab being dragged from the sidebar, following the pointer anywhere in the window. Over the
+/// page it sinks into the split view preview that shows where it will open.
+private struct DragGhostLayer: View {
+    @Environment(Browser.self) private var browser
+    @Environment(SidebarDragController.self) private var dragController
+    @State private var origin: CGPoint = .zero
+
+    var body: some View {
+        Color.clear
+            .overlay(alignment: .topLeading) { ghost }
+            .onGeometryChange(for: CGPoint.self) { $0.frame(in: .global).origin } action: { origin = $0 }
+            .allowsHitTesting(false)
+    }
+
+    @ViewBuilder private var ghost: some View {
+        if let tabID = dragController.draggedTabID,
+           let tab = browser.allTabs.first(where: { $0.id == tabID }),
+           let size = dragController.tabFrames[tabID]?.size {
+            let isOverSplitTarget = dragController.splitDropSide != nil
+            SidebarDragGhost(tab: tab, isTile: browser.position(of: tab)?.section == .favorites, size: size)
+                .scaleEffect(isOverSplitTarget ? 0.7 : 1)
+                .opacity(isOverSplitTarget ? 0 : 1)
+                .offset(
+                    x: dragController.location.x - dragController.grabOffset.width - size.width / 2 - origin.x,
+                    y: dragController.location.y - dragController.grabOffset.height - size.height / 2 - origin.y
+                )
+        }
+    }
+}
+
+/// Where a tab dragged onto the page will open: a card in the space's colors over that half,
+/// sliding across as the pointer crosses the middle.
+private struct SplitDropPreview: View {
+    @Environment(Browser.self) private var browser
+    @Environment(SidebarDragController.self) private var dragController
+
+    var body: some View {
+        ZStack {
+            if let side = dragController.splitDropSide,
+               let tab = browser.allTabs.first(where: { $0.id == dragController.draggedTabID }) {
+                GeometryReader { proxy in
+                    ZStack(alignment: side == .leading ? .leading : .trailing) {
+                        Color.black.opacity(0.15)
+                            .clipShape(RoundedRectangle(cornerRadius: Theme.contentCornerRadius, style: .continuous))
+                        SplitDropCard(tab: tab, theme: browser.activeSpace.theme)
+                            .frame(width: (proxy.size.width - Theme.contentInset) / 2)
+                    }
+                }
+                .transition(.opacity)
+            }
+        }
+        .allowsHitTesting(false)
+    }
+}
+
+private struct SplitDropCard: View {
+    let tab: Tab
+    let theme: SpaceTheme
+    @State private var isSettled = false
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    var body: some View {
+        let shape = RoundedRectangle(cornerRadius: Theme.contentCornerRadius, style: .continuous)
+        VStack(spacing: 10) {
+            FaviconView(tab: tab, size: 32)
+            Text(tab.displayTitle)
+                .font(.system(size: 14, weight: .semibold))
+                .lineLimit(1)
+                .padding(.horizontal, 24)
+            Text("Open in Split View")
+                .font(.system(size: 12))
+                .opacity(0.7)
+        }
+        .foregroundStyle(Theme.sidebarText)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(Theme.sidebarGradient(theme), in: shape)
+        .overlay(shape.strokeBorder(.white.opacity(0.45), lineWidth: 1.5))
+        .shadow(color: .black.opacity(0.25), radius: 18, y: 6)
+        // Pops in with a little bounce, like a pane making room.
+        .scaleEffect(isSettled || reduceMotion ? 1 : 0.9)
+        .onAppear {
+            withAnimation(.spring(response: 0.38, dampingFraction: 0.68)) { isSettled = true }
         }
     }
 }

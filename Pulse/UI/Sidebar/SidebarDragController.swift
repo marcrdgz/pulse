@@ -31,6 +31,11 @@ final class SidebarDragController {
     @ObservationIgnored var spaceSwitcherFrame: CGRect?
     @ObservationIgnored var spaceDotFrames: [Space.ID: CGRect] = [:]
 
+    /// Over the page, the side the dragged tab would open on in a split view.
+    private(set) var splitDropSide: SplitSide?
+    /// The page area, which takes tabs dropped on it into a split view.
+    @ObservationIgnored var contentFrame: CGRect?
+
     /// The space whose dot is being dragged along the switcher to reorder it.
     private(set) var draggedSpaceID: Space.ID?
 
@@ -57,6 +62,21 @@ final class SidebarDragController {
             draggedTabID = tab.id
         }
         self.location = location
+
+        if let contentFrame, contentFrame.contains(location) {
+            pendingSection = nil
+            isOverSpaceSwitcher = false
+            hoveredSpaceID = nil
+            let side: SplitSide = location.x < contentFrame.midX ? .leading : .trailing
+            let target = browser.tabKept(droppingTab: tab, on: side) == nil ? nil : side
+            if target != splitDropSide {
+                withAnimation(.spring(response: 0.35, dampingFraction: 0.78)) { splitDropSide = target }
+            }
+            return
+        }
+        if splitDropSide != nil {
+            withAnimation(.snappy(duration: 0.2)) { splitDropSide = nil }
+        }
 
         guard let source = browser.position(of: tab) else {
             pendingSection = nil
@@ -85,13 +105,21 @@ final class SidebarDragController {
 
     func drop(_ tab: Tab, at location: CGPoint, in browser: Browser) {
         let isOverSpaceSwitcher = isOverSpaceSwitcher
+        let splitDropSide = splitDropSide
+        let isOverContent = contentFrame?.contains(location) ?? false
         let targetSpace = browser.spaces.first { $0.id == hoveredSpaceID && $0.id != browser.activeSpaceID }
         let source = browser.position(of: tab)
         let destination = destination(for: tab, at: location, in: browser)
         // End first: a view inserted while it is still dimmed as the drag placeholder
         // can keep that opacity once the insertion animation runs.
         endDrag()
-        if isOverSpaceSwitcher {
+        if let splitDropSide, let kept = browser.tabKept(droppingTab: tab, on: splitDropSide) {
+            withAnimation(.spring(response: 0.4, dampingFraction: 0.82)) {
+                browser.splitView(kept, with: tab, on: splitDropSide)
+            }
+        } else if isOverContent {
+            // Missing the page's split targets doesn't fall through to the sections behind it.
+        } else if isOverSpaceSwitcher {
             if let targetSpace {
                 withAnimation(.snappy(duration: 0.25)) { browser.moveTab(tab, to: targetSpace) }
             }
@@ -108,6 +136,7 @@ final class SidebarDragController {
             pendingSection = nil
             showsDropZones = false
             hoveredSpaceID = nil
+            splitDropSide = nil
         }
         isOverSpaceSwitcher = false
     }

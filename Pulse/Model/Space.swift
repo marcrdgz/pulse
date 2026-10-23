@@ -7,6 +7,10 @@ enum SpaceTheme: String, CaseIterable {
     var displayName: String { rawValue.capitalized }
 }
 
+enum SplitSide {
+    case leading, trailing
+}
+
 /// Two tabs of a space shown side by side, listed as one sidebar row in the leading tab's place.
 struct TabSplit: Codable, Equatable {
     var leading: Tab.ID

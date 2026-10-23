@@ -10,8 +10,8 @@ A native macOS browser built on WebKit, with Arc's look and keyboard-first workf
   type or visit often, history ranked by frequency and recency, open tabs and Google suggestions.
   ⇥ or → accepts the completion, ⇧⌦ removes a suggestion from history. It also runs actions, like
   Arc's: type "pin", "move tab to work", "devtools" or "clear data" and pick it right below the top result.
-- Split view like Arc's: ⌃⇧= opens a page next to the current tab (or right-click a tab › Open in
-  Split View). The pair is one sidebar row, drag the gap between pages to resize them, and the split
+- Split view like Arc's: drag a tab from the sidebar onto either half of the page, press ⌃⇧= to open a
+  page next to the current tab, or right-click a tab › Open in Split View. The pair is one sidebar row, drag the gap between pages to resize them, and the split
   is saved with the session.
 - Inset rounded web content, collapsible sidebar that peeks in from the left edge.
 - Drag tabs to reorder them, or between Favorites, Pinned and Today; resize the sidebar by its edge.
