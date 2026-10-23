@@ -4,6 +4,7 @@ import Foundation
 enum InternalPage: String {
     case history
     case downloads
+    case whatsNew = "whats-new"
 
     /// Accepts `chrome://` too, so muscle memory from Chrome keeps working.
     init?(url: URL) {
@@ -19,6 +20,7 @@ enum InternalPage: String {
         switch self {
         case .history: "History"
         case .downloads: "Downloads"
+        case .whatsNew: "What's New"
         }
     }
 
@@ -26,6 +28,7 @@ enum InternalPage: String {
         switch self {
         case .history: "clock.arrow.circlepath"
         case .downloads: "arrow.down.circle"
+        case .whatsNew: "sparkles"
         }
     }
 }

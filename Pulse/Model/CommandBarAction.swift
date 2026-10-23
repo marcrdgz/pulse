@@ -22,6 +22,7 @@ struct CommandBarAction: Identifiable {
         case reopenClosedTab
         case showHistory
         case showDownloads
+        case showWhatsNew
         case clearBrowsingData
         case openSettings
         case showWebInspector
@@ -142,6 +143,7 @@ extension Browser {
         actions += [
             Action(kind: .showHistory, title: "Show History", symbol: "clock", shortcut: "⌘Y"),
             Action(kind: .showDownloads, title: "Show Downloads", symbol: "arrow.down.circle", shortcut: "⇧⌘J"),
+            Action(kind: .showWhatsNew, title: "What's New in Pulse", symbol: "sparkles", keywords: ["release notes", "changelog", "update"]),
             Action(
                 kind: .clearBrowsingData,
                 title: "Clear Browsing Data",
@@ -196,6 +198,7 @@ extension Browser {
         case .reopenClosedTab: reopenClosedTab()
         case .showHistory: showHistory()
         case .showDownloads: showDownloads()
+        case .showWhatsNew: showWhatsNew()
         case .clearBrowsingData: showClearBrowsingData()
         case .openSettings: break
         case .showWebInspector: tab?.showWebInspector()

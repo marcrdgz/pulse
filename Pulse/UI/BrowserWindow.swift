@@ -152,6 +152,9 @@ struct BrowserWindow: View {
         } else if tab.internalPage == .downloads {
             DownloadsPage()
                 .simultaneousGesture(focusOnClick(tab))
+        } else if tab.internalPage == .whatsNew {
+            WhatsNewPage()
+                .simultaneousGesture(focusOnClick(tab))
         } else {
             webPage(for: tab, isFocused: isFocused)
         }

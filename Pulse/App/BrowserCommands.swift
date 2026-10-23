@@ -66,6 +66,7 @@ struct BrowserCommands: Commands {
 
             // Pulse has no help book: the system item would only say help isn't available.
             CommandGroup(replacing: .help) {
+                Button("What's New in Pulse", action: mainBrowser.showWhatsNew)
                 Button("Report a Problem…") { ProblemReport.file(from: mainBrowser) }
             }
         }

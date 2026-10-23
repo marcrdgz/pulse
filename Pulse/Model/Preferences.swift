@@ -114,6 +114,8 @@ final class Preferences {
     var adsAllowedSites: [String] { didSet { save(adsAllowedSites, Key.adsAllowedSites) } }
     /// How long a tab stays off screen before it sleeps.
     var tabSleepDelay: TabSleepDelay { didSet { save(tabSleepDelay.rawValue, Key.tabSleepDelay) } }
+    /// The version whose What's New was last offered, so each update announces itself once.
+    var lastSeenVersion: String? { didSet { if let lastSeenVersion { save(lastSeenVersion, Key.lastSeenVersion) } } }
 
     @ObservationIgnored private let defaults: UserDefaults?
 
@@ -126,6 +128,7 @@ final class Preferences {
         static let blocksAds = "blocksAdsAndTrackers"
         static let adsAllowedSites = "adsAllowedSites"
         static let tabSleepDelay = "tabSleepDelayMinutes"
+        static let lastSeenVersion = "lastSeenVersion"
     }
 
     init(defaults: UserDefaults? = nil) {
@@ -138,6 +141,7 @@ final class Preferences {
         blocksAdsAndTrackers = defaults?.object(forKey: Key.blocksAds) as? Bool ?? true
         adsAllowedSites = defaults?.stringArray(forKey: Key.adsAllowedSites) ?? []
         tabSleepDelay = (defaults?.object(forKey: Key.tabSleepDelay) as? Int).flatMap(TabSleepDelay.init) ?? .oneHour
+        lastSeenVersion = defaults?.string(forKey: Key.lastSeenVersion)
     }
 
     private func save(_ value: Any, _ key: String) {

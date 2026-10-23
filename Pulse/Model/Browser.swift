@@ -119,6 +119,9 @@ final class Browser: NSObject {
         } else if sessionStore != nil, !preferences.hasCompletedOnboarding {
             isOnboardingPresented = true
         }
+        if sessionStore != nil {
+            announceUpdate(to: Bundle.main.shortVersion, releases: ReleaseNotes.bundled)
+        }
         if activeTab == nil, !isOnboardingPresented {
             commandBar = .newTab
         }
@@ -486,6 +489,22 @@ final class Browser: NSObject {
     }
 
     // MARK: Onboarding and import
+
+    func showWhatsNew() {
+        commandBar = nil
+        openTab(url: InternalPage.whatsNew.url)
+    }
+
+    /// Opens What's New on the first launch after an update that has highlights; a fresh install
+    /// only records the version, since onboarding already introduces Pulse.
+    func announceUpdate(to appVersion: String, releases: [ReleaseNotes]) {
+        let lastSeenVersion = preferences.lastSeenVersion
+        preferences.lastSeenVersion = appVersion
+        let isUpdate = lastSeenVersion.map { $0.compare(appVersion, options: .numeric) == .orderedAscending }
+            ?? preferences.hasCompletedOnboarding
+        guard isUpdate, releases.first(where: { $0.version == appVersion })?.highlights.isEmpty == false else { return }
+        openTab(url: InternalPage.whatsNew.url)
+    }
 
     func showChromeImport() {
         isChromeImportPresented = true

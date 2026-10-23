@@ -78,6 +78,25 @@ struct SidebarIconButtonStyle: ButtonStyle {
     }
 }
 
+/// The palette of the Halo mark, as the site uses it (`site/src/styles/global.css`). The ring's
+/// gradient belongs to the mark; pages use the flare and accent as single colors.
+enum Brand {
+    static let ring: [Color] = [
+        .dynamic(light: NSColor(hex: 0xFF9A3D), dark: NSColor(hex: 0xFFC27A)),
+        .dynamic(light: NSColor(hex: 0xE0307A), dark: NSColor(hex: 0xFF5A9A)),
+        .dynamic(light: NSColor(hex: 0x7B4DFF), dark: NSColor(hex: 0xA98BFF)),
+        .dynamic(light: NSColor(hex: 0x2A1B6B), dark: NSColor(hex: 0x8B7BFF)),
+    ]
+    static let flare = Color.dynamic(light: NSColor(hex: 0xFF8A4C), dark: NSColor(hex: 0xFFB547))
+    static let glow = Color.dynamic(light: NSColor(hex: 0xFFB547), dark: NSColor(hex: 0xFFC27A))
+    static let accent = Color.dynamic(light: NSColor(hex: 0x7B4DFF), dark: NSColor(hex: 0xA98BFF))
+    static let paper = Color.dynamic(light: NSColor(hex: 0xF4F2F8), dark: NSColor(hex: 0x12101C))
+    static let card = Color.dynamic(light: .white, dark: NSColor(hex: 0x1B1926))
+    static let ink = Color.dynamic(light: NSColor(hex: 0x15131D), dark: NSColor(hex: 0xF4F3FA))
+    static let dim = Color.dynamic(light: NSColor(hex: 0x6B6787), dark: NSColor(hex: 0xA19DB8))
+    static let line = Color.dynamic(light: NSColor(hex: 0xE3E0EE), dark: NSColor(hex: 0x2D2A3C))
+}
+
 extension AnyTransition {
     /// Slides in from `edge` while fading, or only fades when the user asked to reduce motion.
     static func slide(from edge: Edge, reduceMotion: Bool) -> AnyTransition {
