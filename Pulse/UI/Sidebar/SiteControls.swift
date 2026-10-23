@@ -106,11 +106,15 @@ struct SiteControls: View {
     }
 
     private func switchRow(_ title: String, symbol: String, isOn: Binding<Bool>) -> some View {
-        Toggle(isOn: isOn) {
+        // macOS packs a switch next to its label, so the row spreads them itself.
+        HStack {
             Label(title, systemImage: symbol)
                 .labelStyle(SiteControlLabelStyle())
+            Spacer(minLength: 12)
+            Toggle(title, isOn: isOn)
+                .toggleStyle(.switch)
+                .labelsHidden()
         }
-        .toggleStyle(.switch)
         .padding(.horizontal, 16)
         .padding(.vertical, 6)
     }
