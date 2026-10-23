@@ -16,6 +16,10 @@ final class SidebarDragController {
     /// dragged tab's section upwards, where they live: opening them on pickup would push the rows
     /// under the pointer down and turn a quick reorder into a move to the wrong slot.
     private(set) var showsDropZones = false
+    /// The space whose dot is under the pointer; its name shows above it, since dots only differ by color.
+    private(set) var hoveredSpaceID: Space.ID?
+    /// Over the space switcher a drop moves the tab to the hovered space instead of a section.
+    @ObservationIgnored private var isOverSpaceSwitcher = false
 
     // Layout reports; not observed so frame updates don't re-render the sidebar.
     @ObservationIgnored var tabFrames: [Tab.ID: CGRect] = [:]
@@ -24,6 +28,8 @@ final class SidebarDragController {
     @ObservationIgnored var todayAreaFrame: CGRect?
     /// The visible part of the active space's scrolling list; rows scrolled out of it can't be hit.
     @ObservationIgnored var scrollViewportFrame: CGRect?
+    @ObservationIgnored var spaceSwitcherFrame: CGRect?
+    @ObservationIgnored var spaceDotFrames: [Space.ID: CGRect] = [:]
 
     var isDragging: Bool { draggedTabID != nil }
 
@@ -36,6 +42,10 @@ final class SidebarDragController {
         self.location = location
 
         guard let source = browser.position(of: tab) else {
+            pendingSection = nil
+            return
+        }
+        if updateSpaceHover(source: source, at: location, in: browser) {
             pendingSection = nil
             return
         }
@@ -57,12 +67,18 @@ final class SidebarDragController {
     }
 
     func drop(_ tab: Tab, at location: CGPoint, in browser: Browser) {
+        let isOverSpaceSwitcher = isOverSpaceSwitcher
+        let targetSpace = browser.spaces.first { $0.id == hoveredSpaceID && $0.id != browser.activeSpaceID }
         let source = browser.position(of: tab)
         let destination = destination(for: tab, at: location, in: browser)
         // End first: a view inserted while it is still dimmed as the drag placeholder
         // can keep that opacity once the insertion animation runs.
         endDrag()
-        if let source, let destination, destination.section != source.section {
+        if isOverSpaceSwitcher {
+            if let targetSpace {
+                withAnimation(.snappy(duration: 0.25)) { browser.moveTab(tab, to: targetSpace) }
+            }
+        } else if let source, let destination, destination.section != source.section {
             withAnimation(.snappy(duration: 0.25)) { browser.moveTab(tab, to: destination) }
         }
     }
@@ -74,7 +90,24 @@ final class SidebarDragController {
             draggedTabID = nil
             pendingSection = nil
             showsDropZones = false
+            hoveredSpaceID = nil
         }
+        isOverSpaceSwitcher = false
+    }
+
+    /// Returns whether the pointer is over the space switcher, which takes over from the sections.
+    private func updateSpaceHover(source: TabPosition, at location: CGPoint, in browser: Browser) -> Bool {
+        // Favorites belong to no space, as in "Move to Space".
+        guard source.section != .favorites, browser.spaces.count > 1,
+              spaceSwitcherFrame?.insetBy(dx: 0, dy: -6).contains(location) ?? false
+        else {
+            isOverSpaceSwitcher = false
+            hoveredSpaceID = nil
+            return false
+        }
+        isOverSpaceSwitcher = true
+        hoveredSpaceID = browser.spaces.first { spaceDotFrames[$0.id]?.contains(location) ?? false }?.id
+        return true
     }
 
     /// Favorites sit above everything, so zones opening below them never move their tiles.

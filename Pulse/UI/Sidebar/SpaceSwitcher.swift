@@ -4,6 +4,7 @@ import SwiftUI
 /// The bottom bar: one dot per space and a button to create a new one.
 struct SpaceSwitcher: View {
     @Environment(Browser.self) private var browser
+    @Environment(SidebarDragController.self) private var dragController
 
     var body: some View {
         HStack(spacing: 2) {
@@ -24,25 +25,57 @@ struct SpaceSwitcher: View {
             .accessibilityLabel("New Space")
         }
         .frame(height: 28)
+        .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { frame in
+            dragController.spaceSwitcherFrame = frame
+        }
         .animation(.snappy(duration: 0.2), value: browser.activeSpaceID)
     }
 }
 
 struct SpaceDot: View {
     @Environment(Browser.self) private var browser
+    /// Absent in the collapsed sidebar, which has no tab dragging.
+    @Environment(SidebarDragController.self) private var dragController: SidebarDragController?
     let space: Space
     let isActive: Bool
 
     var body: some View {
+        let isHovered = dragController?.hoveredSpaceID == space.id
+        let isProminent = isActive || isHovered
         Button { browser.selectSpace(space) } label: {
             Circle()
                 .fill(Theme.swatch(space.theme))
-                .frame(width: isActive ? 10 : 7, height: isActive ? 10 : 7)
-                .opacity(isActive ? 1 : 0.55)
+                .frame(width: isProminent ? 10 : 7, height: isProminent ? 10 : 7)
+                .opacity(isProminent ? 1 : 0.55)
                 .frame(width: 22, height: 22)
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+        .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { frame in
+            dragController?.spaceDotFrames[space.id] = frame
+        }
+        // Above the dot and starting at its leading edge, so it covers no other dot and stays in the window.
+        .overlay(alignment: .bottomLeading) {
+            if isHovered {
+                Text(space.name)
+                    .font(.system(size: 12, weight: .medium))
+                    .lineLimit(1)
+                    .fixedSize()
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 3)
+                    .background(
+                        Capsule()
+                            .fill(.regularMaterial)
+                            .shadow(color: .black.opacity(0.18), radius: 6, y: 2)
+                    )
+                    // The active space is no drop target.
+                    .opacity(isActive ? 0.6 : 1)
+                    .offset(y: -26)
+                    .allowsHitTesting(false)
+                    .transition(.opacity)
+            }
+        }
+        .animation(.snappy(duration: 0.15), value: isHovered)
         .accessibilityLabel(space.name)
         .accessibilityAddTraits(isActive ? .isSelected : [])
         .contextMenu { SpaceContextMenu(space: space) }
