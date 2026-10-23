@@ -1,8 +1,16 @@
 import AppKit
 import WebKit
 
-/// Lets the tab's coordinator rewrite WebKit's context menu before it opens.
+/// Lets the tab's coordinator rewrite WebKit's context menu before it opens, and tells split view
+/// which pane has focus.
 final class BrowserWebView: WKWebView {
+    /// Clicking into a split view's other pane focuses its tab.
+    override func becomeFirstResponder() -> Bool {
+        guard super.becomeFirstResponder() else { return false }
+        if let tab = (uiDelegate as? WebViewCoordinator)?.tab { tab.browser?.focusPane(of: tab) }
+        return true
+    }
+
     override func willOpenMenu(_ menu: NSMenu, with event: NSEvent) {
         super.willOpenMenu(menu, with: event)
         (uiDelegate as? WebViewCoordinator)?.customize(menu, in: self)

@@ -25,6 +25,8 @@ struct Toast: Equatable {
 enum CommandBarMode: Hashable {
     case newTab
     case editActiveTab
+    /// Opens the page next to the active tab in a split view.
+    case splitView
 }
 
 @Observable
@@ -190,10 +192,60 @@ final class Browser: NSObject {
         return tab.adoptWebView(configuration: configuration)
     }
 
+    // MARK: Split view
+
+    /// The split on screen, if the active tab is in one.
+    var activeSplit: TabSplit? { activeSpace.split(containing: activeTabID) }
+
+    /// The tabs on screen, leading pane first.
+    var visibleTabs: [Tab] {
+        if let split = activeSplit,
+           let leading = activeSpace.tab(withID: split.leading),
+           let trailing = activeSpace.tab(withID: split.trailing) {
+            return [leading, trailing]
+        }
+        return activeTab.map { [$0] } ?? []
+    }
+
+    /// Only tabs of the same space split: favorites are shared by every space.
+    func canSplit(_ tab: Tab, with other: Tab) -> Bool {
+        guard tab !== other, let space = space(containing: tab) else { return false }
+        return space.contains(other)
+    }
+
+    /// Shows `other` next to `tab` and focuses it; either leaves the split it was in.
+    func splitView(_ tab: Tab, with other: Tab) {
+        guard canSplit(tab, with: other), let space = space(containing: tab) else { return }
+        separate(tab)
+        separate(other)
+        space.splits.append(TabSplit(leading: tab.id, trailing: other.id))
+        select(other)
+    }
+
+    /// Both tabs stay open as separate rows.
+    func separate(_ tab: Tab) {
+        for space in spaces where space.split(containing: tab.id) != nil {
+            space.splits.removeAll { $0.contains(tab.id) }
+            scheduleSave()
+        }
+    }
+
+    func setSplitRatio(_ ratio: Double) {
+        guard let index = activeSpace.splits.firstIndex(where: { $0.contains(activeTabID) }) else { return }
+        activeSpace.splits[index].ratio = min(max(ratio, TabSplit.ratioRange.lowerBound), TabSplit.ratioRange.upperBound)
+        scheduleSave()
+    }
+
+    /// Clicking into a pane makes its tab the active one.
+    func focusPane(of tab: Tab) {
+        guard tab.id != activeTabID, activeSplit?.contains(tab.id) == true else { return }
+        select(tab)
+    }
+
     /// Selecting a tab from another space switches to that space.
     func select(_ tab: Tab?) {
         let previous = activeTab
-        previous?.wasShown(at: .now)
+        visibleTabs.forEach { $0.wasShown(at: .now) }
         if let tab, let owner = space(containing: tab), owner.id != activeSpaceID {
             activeSpaceID = owner.id
         }
@@ -230,9 +282,14 @@ final class Browser: NSObject {
     func close(_ tab: Tab) {
         let previous = activeTab
         denyPermissionRequests(from: tab)
+        // Closing one pane of a split view leaves the other on screen, like Arc.
+        let partner = space(containing: tab).flatMap { space in
+            space.split(containing: tab.id)?.partner(of: tab.id).flatMap(space.tab(withID:))
+        }
+        separate(tab)
         if tab.isPinned {
             tab.resetToPinnedURL()
-            if tab.id == activeTabID { select(todayTabs.first) }
+            if tab.id == activeTabID { select(partner ?? todayTabs.first) }
         } else if let space = space(containing: tab),
                   let index = space.todayTabs.firstIndex(where: { $0.id == tab.id }) {
             space.todayTabs.remove(at: index)
@@ -246,7 +303,7 @@ final class Browser: NSObject {
                 // Like Chrome, closing a popup or a link opened in a new tab returns to the page that opened it.
                 let opener = tab.opener.flatMap { opener in (favorites + space.tabs).first { $0 === opener } }
                 let neighbor = space.todayTabs.indices.contains(index) ? space.todayTabs[index] : space.todayTabs.last
-                space.activeTabID = (opener ?? neighbor)?.id
+                space.activeTabID = (partner ?? opener ?? neighbor)?.id
             }
         }
 
@@ -311,11 +368,11 @@ final class Browser: NSObject {
     /// Puts tabs to sleep, like Chrome's Memory Saver, except the one on screen and any that are busy.
     func hibernateInactiveTabs(now: Date = .now) async {
         guard let delay = preferences.tabSleepDelay.duration else { return }
-        let shownTab = activeTab
-        shownTab?.wasShown(at: now)
-        for tab in everyTab where tab !== shownTab && now.timeIntervalSince(tab.lastShown) >= delay {
+        let shownTabs = visibleTabs
+        shownTabs.forEach { $0.wasShown(at: now) }
+        for tab in everyTab where !shownTabs.contains(tab) && now.timeIntervalSince(tab.lastShown) >= delay {
             // Checked last: it asks the web process, and the tab may be shown again meanwhile.
-            if await tab.canHibernate(), tab !== activeTab { tab.hibernate() }
+            if await tab.canHibernate(), !visibleTabs.contains(tab) { tab.hibernate() }
         }
     }
 
@@ -535,6 +592,8 @@ final class Browser: NSObject {
     func moveTab(_ tab: Tab, to destination: TabPosition) {
         let wasPinned = tab.isPinned
         guard detach(tab) else { return }
+        // Favorites belong to every space; a split stays within one.
+        if destination.section == .favorites { separate(tab) }
         switch destination.section {
         case .favorites:
             tab.pinnedURL = tab.pinnedURL ?? tab.url
@@ -553,6 +612,7 @@ final class Browser: NSObject {
     /// Moves a tab to the top of another space's today tabs and follows it there.
     func moveTab(_ tab: Tab, to space: Space) {
         guard detach(tab) else { return }
+        separate(tab)
         tab.pinnedURL = nil
         space.todayTabs.insert(tab, at: 0)
         select(tab)
@@ -712,7 +772,7 @@ final class Browser: NSObject {
     // MARK: Command bar
 
     func showCommandBar(_ mode: CommandBarMode) {
-        commandBar = mode == .editActiveTab && activeTab == nil ? .newTab : mode
+        commandBar = mode != .newTab && activeTab == nil ? .newTab : mode
     }
 
     func dismissCommandBar() {
@@ -723,16 +783,28 @@ final class Browser: NSObject {
     func open(_ url: URL, from mode: CommandBarMode, isTyped: Bool = false) {
         if isTyped { history?.recordTyped(url) }
         commandBar = nil
-        if mode == .editActiveTab, let activeTab {
-            activeTab.load(url)
-        } else {
+        switch mode {
+        case .editActiveTab where activeTab != nil:
+            activeTab?.load(url)
+        case .splitView:
+            let tab = openTab(url: url, activate: false)
+            if let activeTab, canSplit(activeTab, with: tab) {
+                splitView(activeTab, with: tab)
+            } else {
+                select(tab)
+            }
+        default:
             openTab(url: url)
         }
     }
 
-    func switchTo(_ tab: Tab) {
+    func switchTo(_ tab: Tab, from mode: CommandBarMode) {
         commandBar = nil
-        select(tab)
+        if mode == .splitView, let activeTab, canSplit(activeTab, with: tab) {
+            splitView(activeTab, with: tab)
+        } else {
+            select(tab)
+        }
     }
 
     // MARK: Find
@@ -805,7 +877,8 @@ final class Browser: NSObject {
                     icon: space.icon,
                     pinnedTabs: space.pinnedTabs.map(Session.SavedTab.init),
                     todayTabs: space.todayTabs.map(Session.SavedTab.init),
-                    activeTabID: space.activeTabID
+                    activeTabID: space.activeTabID,
+                    splits: space.splits.isEmpty ? nil : space.splits
                 )
             },
             activeSpaceID: activeSpaceID
@@ -846,7 +919,8 @@ final class Browser: NSObject {
                 icon: saved.icon,
                 pinnedTabs: saved.pinnedTabs.map(makeTab),
                 todayTabs: saved.todayTabs.map(makeTab),
-                activeTabID: saved.activeTabID
+                activeTabID: saved.activeTabID,
+                splits: saved.splits ?? []
             )
         }
         guard let firstSpace = restoredSpaces.first else { return }
@@ -866,6 +940,7 @@ final class Browser: NSObject {
     private func clearToday() {
         for space in spaces {
             space.todayTabs.removeAll()
+            space.removeStaleSplits()
             if !(favorites + space.pinnedTabs).contains(where: { $0.id == space.activeTabID }) {
                 space.activeTabID = nil
             }

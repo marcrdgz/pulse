@@ -79,61 +79,95 @@ struct BrowserWindow: View {
         }
     }
 
-    private var content: some View {
-        VStack(spacing: 0) {
-            if !browser.isPrivate {
-                DefaultBrowserBanner()
+    @ViewBuilder private var content: some View {
+        let tabs = browser.visibleTabs
+        Group {
+            if let split = browser.activeSplit, tabs.count == 2 {
+                SplitPanes(split: split) {
+                    card { banner; page(for: tabs[0]) }
+                } trailing: {
+                    card { page(for: tabs[1]) }
+                }
+            } else {
+                card {
+                    banner
+                    if let tab = tabs.first {
+                        page(for: tab)
+                    } else {
+                        EmptyStateView()
+                    }
+                }
             }
-            page
         }
-        .clipShape(RoundedRectangle(cornerRadius: Theme.contentCornerRadius, style: .continuous))
-        .background(
-            RoundedRectangle(cornerRadius: Theme.contentCornerRadius, style: .continuous)
-                .fill(Color(nsColor: .windowBackgroundColor))
-                .shadow(color: .black.opacity(0.18), radius: 3, y: 1)
-        )
         .padding(.vertical, Theme.contentInset)
         .padding(.trailing, Theme.contentInset)
     }
 
-    @ViewBuilder private var page: some View {
-        if let tab = browser.activeTab, tab.internalPage == .history {
+    @ViewBuilder private var banner: some View {
+        if !browser.isPrivate {
+            DefaultBrowserBanner()
+        }
+    }
+
+    private func card(@ViewBuilder _ page: () -> some View) -> some View {
+        VStack(spacing: 0, content: page)
+            .clipShape(RoundedRectangle(cornerRadius: Theme.contentCornerRadius, style: .continuous))
+            .background(
+                RoundedRectangle(cornerRadius: Theme.contentCornerRadius, style: .continuous)
+                    .fill(Color(nsColor: .windowBackgroundColor))
+                    .shadow(color: .black.opacity(0.18), radius: 3, y: 1)
+            )
+    }
+
+    /// Prompts and the find bar belong to the focused pane.
+    @ViewBuilder private func page(for tab: Tab) -> some View {
+        let isFocused = tab.id == browser.activeTabID
+        if tab.internalPage == .history {
             HistoryPage(tab: tab)
                 .id(tab.id)
-        } else if browser.activeTab?.internalPage == .downloads {
+                .simultaneousGesture(focusOnClick(tab))
+        } else if tab.internalPage == .downloads {
             DownloadsPage()
-        } else if let tab = browser.activeTab {
-            WebView(tab: tab)
-                .overlay {
-                    if let error = tab.loadError {
-                        LoadErrorView(tab: tab, error: error)
-                    }
-                }
-                .overlay(alignment: .topTrailing) {
-                    if browser.isFindBarVisible {
-                        FindBar()
-                            .padding(12)
-                            .transition(.slide(from: .top, reduceMotion: reduceMotion))
-                    }
-                }
-                .overlay(alignment: .topLeading) {
-                    if let request = browser.activePermissionRequest {
-                        PermissionPrompt(request: request)
-                            .padding(12)
-                            .transition(.slide(from: .top, reduceMotion: reduceMotion))
-                    }
-                }
-                .overlay(alignment: .bottomLeading) {
-                    if let link = tab.hoveredLink {
-                        LinkPreview(link: link)
-                            .transition(.opacity)
-                    }
-                }
-                .animation(.snappy(duration: 0.2), value: browser.activePermissionRequest?.id)
-                .animation(.easeOut(duration: 0.12), value: tab.hoveredLink == nil)
+                .simultaneousGesture(focusOnClick(tab))
         } else {
-            EmptyStateView()
+            webPage(for: tab, isFocused: isFocused)
         }
+    }
+
+    /// Web views focus their pane themselves when clicked; Pulse's own pages need this.
+    private func focusOnClick(_ tab: Tab) -> some Gesture {
+        TapGesture().onEnded { browser.focusPane(of: tab) }
+    }
+
+    private func webPage(for tab: Tab, isFocused: Bool) -> some View {
+        WebView(tab: tab, takesFocus: isFocused)
+            .overlay {
+                if let error = tab.loadError {
+                    LoadErrorView(tab: tab, error: error)
+                }
+            }
+            .overlay(alignment: .topTrailing) {
+                if isFocused, browser.isFindBarVisible {
+                    FindBar()
+                        .padding(12)
+                        .transition(.slide(from: .top, reduceMotion: reduceMotion))
+                }
+            }
+            .overlay(alignment: .topLeading) {
+                if isFocused, let request = browser.activePermissionRequest {
+                    PermissionPrompt(request: request)
+                        .padding(12)
+                        .transition(.slide(from: .top, reduceMotion: reduceMotion))
+                }
+            }
+            .overlay(alignment: .bottomLeading) {
+                if let link = tab.hoveredLink {
+                    LinkPreview(link: link)
+                        .transition(.opacity)
+                }
+            }
+            .animation(.snappy(duration: 0.2), value: browser.activePermissionRequest?.id)
+            .animation(.easeOut(duration: 0.12), value: tab.hoveredLink == nil)
     }
 
     /// Hovering the collapsed rail slides the full sidebar in over the page, like Arc.
@@ -300,6 +334,46 @@ private struct WindowChrome: NSViewRepresentable {
                 window.standardWindowButton(button)?.isHidden = !showsTrafficLights
             }
         }
+    }
+}
+
+/// Two pages side by side, split by a gap that drags to resize them.
+private struct SplitPanes<Leading: View, Trailing: View>: View {
+    @Environment(Browser.self) private var browser
+    let split: TabSplit
+    @ViewBuilder let leading: Leading
+    @ViewBuilder let trailing: Trailing
+    @State private var ratioAtDragStart: Double?
+
+    var body: some View {
+        GeometryReader { proxy in
+            let available = max(proxy.size.width - Theme.contentInset, 1)
+            HStack(spacing: 0) {
+                leading
+                    .frame(width: available * split.ratio)
+                divider(available: available)
+                trailing
+            }
+        }
+    }
+
+    private func divider(available: Double) -> some View {
+        Color.clear
+            .frame(width: Theme.contentInset)
+            .contentShape(Rectangle())
+            .onHover { isHovering in
+                if isHovering { NSCursor.resizeLeftRight.push() } else { NSCursor.pop() }
+            }
+            .gesture(
+                DragGesture(minimumDistance: 0, coordinateSpace: .global)
+                    .onChanged { value in
+                        let start = ratioAtDragStart ?? split.ratio
+                        ratioAtDragStart = start
+                        browser.setSplitRatio(start + value.translation.width / available)
+                    }
+                    .onEnded { _ in ratioAtDragStart = nil }
+            )
+            .accessibilityHidden(true)
     }
 }
 

@@ -96,6 +96,72 @@ struct TabRow: View {
     }
 }
 
+/// Both tabs of a split view in one row, like Arc; each half selects its own tab.
+struct SplitRow: View {
+    @Environment(Browser.self) private var browser
+    let leading: Tab
+    let trailing: Tab
+    /// The space's own active tab, as in `TabRow`.
+    let activeTabID: Tab.ID?
+    let highlightNamespace: Namespace.ID
+    @State private var isHovered = false
+
+    private var isActive: Bool { activeTabID == leading.id || activeTabID == trailing.id }
+
+    var body: some View {
+        HStack(spacing: 0) {
+            half(leading)
+            Rectangle()
+                .fill(Theme.sidebarText.opacity(0.15))
+                .frame(width: 1, height: 16)
+            half(trailing)
+        }
+        .frame(height: 34)
+        .background { background }
+        .onHover { isHovered = $0 }
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel("Split View")
+        .sidebarDraggable(leading)
+    }
+
+    private func half(_ tab: Tab) -> some View {
+        let isFocused = tab.id == activeTabID
+        return HStack(spacing: 6) {
+            FaviconView(tab: tab, size: 16)
+            Text(tab.displayTitle)
+                .lineLimit(1)
+                .truncationMode(.tail)
+            Spacer(minLength: 0)
+            MediaCaptureIndicator(tab: tab)
+                .font(.system(size: 10, weight: .semibold))
+        }
+        .font(.system(size: 13, weight: isFocused ? .medium : .regular))
+        .padding(.horizontal, 8)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .contentShape(Rectangle())
+        .onTapGesture { browser.select(tab) }
+        .contextMenu { TabContextMenu(tab: tab) }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(tab.displayTitle)
+        .accessibilityValue(tab.mediaDescription ?? "")
+        .accessibilityAddTraits(isFocused ? [.isButton, .isSelected] : .isButton)
+        .accessibilityAction { browser.select(tab) }
+        .accessibilityAction(named: "Separate Split View") { browser.separate(tab) }
+    }
+
+    @ViewBuilder private var background: some View {
+        let shape = RoundedRectangle(cornerRadius: Theme.rowCornerRadius, style: .continuous)
+        if isActive {
+            shape
+                .fill(Theme.activeTabFill)
+                .shadow(color: .black.opacity(0.08), radius: 1, y: 1)
+                .matchedGeometryEffect(id: "activeTabHighlight", in: highlightNamespace)
+        } else if isHovered {
+            shape.fill(Theme.hoverFill)
+        }
+    }
+}
+
 struct TabContextMenu: View {
     @Environment(Browser.self) private var browser
     let tab: Tab
@@ -115,6 +181,11 @@ struct TabContextMenu: View {
         }
         if let onRename {
             Button("Rename Tab…", action: onRename)
+        }
+        if browser.space(containing: tab)?.split(containing: tab.id) != nil {
+            Button("Separate Split View") { browser.separate(tab) }
+        } else if let activeTab = browser.activeTab, browser.canSplit(activeTab, with: tab) {
+            Button("Open in Split View") { browser.splitView(activeTab, with: tab) }
         }
         if tab.isPinned, tab.pinnedURL != tab.url, tab.internalPage == nil {
             Button("Keep Current Page as Pinned") { browser.updatePinnedURL(of: tab) }

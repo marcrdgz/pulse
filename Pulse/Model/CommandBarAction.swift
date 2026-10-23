@@ -7,6 +7,7 @@ struct CommandBarAction: Identifiable {
         case togglePin
         case toggleFavorite
         case duplicateTab
+        case toggleSplitView
         case closeTab
         case closeOtherTabs
         case reload
@@ -67,6 +68,15 @@ extension Browser {
                 Action(kind: .reload, title: "Reload Page", symbol: "arrow.clockwise", keywords: ["refresh"], shortcut: "⌘R"),
                 Action(kind: .findOnPage, title: "Find on Page", symbol: "text.magnifyingglass", keywords: ["text"], shortcut: "⌘F"),
             ]
+            if space(containing: tab) != nil {
+                actions.append(Action(
+                    kind: .toggleSplitView,
+                    title: activeSplit == nil ? "Add Split View" : "Separate Split View",
+                    symbol: "rectangle.split.2x1",
+                    keywords: ["side"],
+                    shortcut: "⌃⇧="
+                ))
+            }
             if tab.isPlayingAudio || tab.isMuted {
                 actions.append(Action(
                     kind: .toggleMuted,
@@ -168,6 +178,8 @@ extension Browser {
         case .togglePin: if let tab { togglePin(tab) }
         case .toggleFavorite: if let tab { toggleFavorite(tab) }
         case .duplicateTab: if let tab { duplicate(tab) }
+        case .toggleSplitView:
+            if let tab, activeSplit != nil { separate(tab) } else { showCommandBar(.splitView) }
         case .closeTab: closeActiveTab()
         case .closeOtherTabs: if let tab { closeOtherTabs(than: tab) }
         case .reload: tab?.reload()

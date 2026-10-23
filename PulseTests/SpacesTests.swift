@@ -67,7 +67,7 @@ struct SpacesTests {
         let homeTab = browser.openTab(url: a)
         browser.createSpace()
 
-        browser.switchTo(homeTab)
+        browser.switchTo(homeTab, from: .newTab)
         #expect(browser.activeSpace === home)
         #expect(browser.everyTab.first === homeTab)
     }

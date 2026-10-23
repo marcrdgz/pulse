@@ -20,6 +20,7 @@ struct Session: Codable, Equatable {
         var pinnedTabs: [SavedTab]
         var todayTabs: [SavedTab]
         var activeTabID: UUID?
+        var splits: [TabSplit]? = nil
     }
 
     var favorites: [SavedTab]

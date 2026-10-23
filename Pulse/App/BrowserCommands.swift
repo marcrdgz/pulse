@@ -147,6 +147,15 @@ struct BrowserCommands: Commands {
             Button(activeTab?.isMuted == true ? "Unmute Tab" : "Mute Tab") { activeTab?.toggleMuted() }
                 .keyboardShortcut("m", modifiers: .control)
                 .disabled(activeTab == nil)
+            if let activeTab, browser.activeSplit != nil {
+                Button("Separate Split View") { browser.separate(activeTab) }
+                    .keyboardShortcut("=", modifiers: [.control, .shift])
+            } else {
+                // Favorites can't split: they're shared by every space.
+                Button("Add Split View") { browser.showCommandBar(.splitView) }
+                    .keyboardShortcut("=", modifiers: [.control, .shift])
+                    .disabled(activeTab.flatMap(browser.space(containing:)) == nil)
+            }
 
             Divider()
             Button("Next Tab") { browser.selectAdjacentTab(offset: 1) }

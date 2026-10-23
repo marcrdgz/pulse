@@ -19,7 +19,7 @@ struct CommandBarView: View {
     }
 
     private var result: OmniboxResult {
-        guard hasEdited || mode == .newTab else { return OmniboxResult(suggestions: [], inlineCompletion: nil) }
+        guard hasEdited || mode != .editActiveTab else { return OmniboxResult(suggestions: [], inlineCompletion: nil) }
         _ = browser.history?.revision
         return Omnibox.result(
             for: text,
@@ -128,7 +128,7 @@ struct CommandBarView: View {
         // Addresses picked in the omnibox count as typed, which ranks them higher next time.
         case .navigate(let url, _): browser.open(url, from: mode, isTyped: true)
         case .search(_, let url): browser.open(url, from: mode)
-        case .switchTo(let tab): browser.switchTo(tab)
+        case .switchTo(let tab): browser.switchTo(tab, from: mode)
         case .action(let action) where action.kind == .openSettings:
             browser.dismissCommandBar()
             openSettings()

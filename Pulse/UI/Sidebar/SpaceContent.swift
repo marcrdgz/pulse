@@ -72,9 +72,23 @@ struct SpaceContent: View {
         .animation(.snappy(duration: 0.22), value: space.todayTabs.map(\.id))
     }
 
-    private func row(for tab: Tab) -> some View {
-        TabRow(tab: tab, isActive: tab.id == space.activeTabID, highlightNamespace: activeHighlight)
-            .transition(.asymmetric(
+    /// A split view is one row in its leading tab's place; its trailing tab has none of its own.
+    @ViewBuilder private func row(for tab: Tab) -> some View {
+        Group {
+            if let split = space.split(containing: tab.id) {
+                if split.leading == tab.id, let trailing = space.tab(withID: split.trailing) {
+                    SplitRow(
+                        leading: tab,
+                        trailing: trailing,
+                        activeTabID: space.activeTabID,
+                        highlightNamespace: activeHighlight
+                    )
+                }
+            } else {
+                TabRow(tab: tab, isActive: tab.id == space.activeTabID, highlightNamespace: activeHighlight)
+            }
+        }
+        .transition(.asymmetric(
                 insertion: .move(edge: .top).combined(with: .opacity),
                 removal: .opacity
             ))
