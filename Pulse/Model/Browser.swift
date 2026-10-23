@@ -62,6 +62,7 @@ final class Browser {
     @ObservationIgnored let sitePermissions: SitePermissionStore?
     @ObservationIgnored private var saveTask: Task<Void, Never>?
     @ObservationIgnored private var toastTask: Task<Void, Never>?
+    @ObservationIgnored private var hibernationTask: Task<Void, Never>?
 
     struct ClosedTab: Identifiable {
         let id = UUID()
@@ -162,6 +163,7 @@ final class Browser {
 
     /// Selecting a tab from another space switches to that space.
     func select(_ tab: Tab?) {
+        activeTab?.wasShown(at: .now)
         if let tab, let owner = space(containing: tab), owner.id != activeSpaceID {
             activeSpaceID = owner.id
         }
@@ -248,6 +250,30 @@ final class Browser {
         guard tab.isPinned else { return }
         tab.pinnedURL = tab.url
         scheduleSave()
+    }
+
+    // MARK: Memory
+
+    /// Checks every minute for tabs that have been off screen longer than the user's setting.
+    func startHibernatingInactiveTabs() {
+        guard hibernationTask == nil else { return }
+        hibernationTask = Task { [weak self] in
+            while !Task.isCancelled {
+                try? await Task.sleep(for: .seconds(60))
+                await self?.hibernateInactiveTabs()
+            }
+        }
+    }
+
+    /// Puts tabs to sleep, like Chrome's Memory Saver, except the one on screen and any that are busy.
+    func hibernateInactiveTabs(now: Date = .now) async {
+        guard let delay = preferences.tabSleepDelay.duration else { return }
+        let shownTab = activeTab
+        shownTab?.wasShown(at: now)
+        for tab in everyTab where tab !== shownTab && now.timeIntervalSince(tab.lastShown) >= delay {
+            // Checked last: it asks the web process, and the tab may be shown again meanwhile.
+            if await tab.canHibernate(), tab !== activeTab { tab.hibernate() }
+        }
     }
 
     // MARK: History
@@ -540,6 +566,7 @@ final class Browser {
 
     func selectSpace(_ space: Space) {
         guard space.id != activeSpaceID, spaces.contains(where: { $0.id == space.id }) else { return }
+        activeTab?.wasShown(at: .now)
         activeSpaceID = space.id
         isFindBarVisible = false
         commandBar = nil

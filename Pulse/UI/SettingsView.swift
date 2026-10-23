@@ -47,6 +47,18 @@ private struct GeneralSettings: View {
                     .font(.footnote)
                     .foregroundStyle(.secondary)
             }
+            Section {
+                Picker("Sleep inactive tabs after", selection: $preferences.tabSleepDelay) {
+                    ForEach(TabSleepDelay.allCases) { Text($0.title).tag($0) }
+                }
+            } header: {
+                Text("Memory")
+            } footer: {
+                Text("Sleeping tabs free their memory and reload where they were when you return. "
+                    + "Tabs playing audio or using your camera or microphone stay awake.")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+            }
         }
         .formStyle(.grouped)
         .onAppear { isDefaultBrowser = DefaultBrowser.isDefault }

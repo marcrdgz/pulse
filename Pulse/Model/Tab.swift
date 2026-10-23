@@ -17,6 +17,8 @@ final class Tab: Identifiable {
     private(set) var hoveredLink: String?
     private(set) var cameraCaptureState: WKMediaCaptureState = .none
     private(set) var microphoneCaptureState: WKMediaCaptureState = .none
+    /// Asleep to free memory; showing the tab brings the page back where it was.
+    private(set) var isHibernated = false
     /// The page a pinned tab returns to when closed; `nil` for today tabs.
     var pinnedURL: URL?
     /// Set by the user from the sidebar; overrides the page title.
@@ -29,6 +31,12 @@ final class Tab: Identifiable {
     @ObservationIgnored private var coordinator: WebViewCoordinator?
     @ObservationIgnored private var observations: [NSKeyValueObservation] = []
     @ObservationIgnored private var appliedRuleListIDs: [String] = []
+    /// The back/forward list and scroll position saved when the tab went to sleep.
+    @ObservationIgnored private var hibernatedState: Any?
+    /// Pages opened by script keep a live `window.opener` (sign-in popups), which a reload would cut.
+    @ObservationIgnored private var isOpenedByScript = false
+    /// When the tab was last on screen; inactive tabs go to sleep after a while.
+    @ObservationIgnored private(set) var lastShown = Date.now
 
     struct LoadError: Equatable {
         let url: URL
@@ -63,17 +71,46 @@ final class Tab: Identifiable {
         customTitle ?? internalPage?.title ?? (title.isEmpty ? (url.displayHost ?? "New Tab") : title)
     }
 
-    /// Created on first access so restored and background tabs cost nothing until shown.
+    /// Created on first access so restored, background and sleeping tabs cost nothing until shown.
     var webView: WKWebView {
         if let loadedWebView { return loadedWebView }
         let webView = attach(BrowserWebView(frame: .zero, configuration: Self.makeConfiguration()))
-        webView.load(URLRequest(url: url))
+        if let hibernatedState {
+            webView.interactionState = hibernatedState
+        } else {
+            webView.load(URLRequest(url: url))
+        }
+        hibernatedState = nil
+        isHibernated = false
+        lastShown = .now
         return webView
     }
 
     /// Hosts a web view WebKit asked for (`window.open`, `target=_blank`); WebKit drives its loading.
     func adoptWebView(configuration: WKWebViewConfiguration) -> WKWebView {
-        attach(BrowserWebView(frame: .zero, configuration: configuration))
+        isOpenedByScript = true
+        return attach(BrowserWebView(frame: .zero, configuration: configuration))
+    }
+
+    func wasShown(at date: Date) {
+        lastShown = date
+    }
+
+    /// Whether the page can sleep without the user losing anything: it isn't playing media,
+    /// using the camera or microphone, or talking to the page that opened it.
+    func canHibernate() async -> Bool {
+        guard let loadedWebView, !isOpenedByScript, cameraCaptureState == .none, microphoneCaptureState == .none
+        else { return false }
+        return await loadedWebView.requestMediaPlaybackState() != .playing
+    }
+
+    /// Frees the web view, keeping its back/forward list so showing the tab restores the page.
+    func hibernate() {
+        guard let loadedWebView else { return }
+        let state = loadedWebView.interactionState
+        unload()
+        hibernatedState = state
+        isHibernated = true
     }
 
     func load(_ url: URL) {
@@ -85,6 +122,9 @@ final class Tab: Identifiable {
             title = ""
         } else {
             self.url = url
+            // A sleeping tab wakes up on the new page rather than the one it slept on.
+            hibernatedState = nil
+            isHibernated = false
             loadedWebView?.load(URLRequest(url: url))
         }
         browser?.tabDidUpdate()
@@ -180,6 +220,8 @@ final class Tab: Identifiable {
     func unload() {
         observations.removeAll()
         appliedRuleListIDs = []
+        hibernatedState = nil
+        isHibernated = false
         loadedWebView?.stopLoading()
         loadedWebView?.removeFromSuperview()
         loadedWebView = nil

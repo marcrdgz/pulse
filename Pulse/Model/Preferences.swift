@@ -77,6 +77,29 @@ enum StartupBehavior: String, CaseIterable, Identifiable {
     }
 }
 
+/// Minutes off screen before a tab sleeps.
+enum TabSleepDelay: Int, CaseIterable, Identifiable {
+    case never = 0
+    case fifteenMinutes = 15
+    case thirtyMinutes = 30
+    case oneHour = 60
+    case twoHours = 120
+
+    var id: Self { self }
+
+    var duration: TimeInterval? { self == .never ? nil : TimeInterval(rawValue * 60) }
+
+    var title: String {
+        switch self {
+        case .never: "Never"
+        case .fifteenMinutes: "15 minutes"
+        case .thirtyMinutes: "30 minutes"
+        case .oneHour: "1 hour"
+        case .twoHours: "2 hours"
+        }
+    }
+}
+
 /// User settings, stored in `UserDefaults` when one is given (in memory otherwise, for tests).
 @Observable
 final class Preferences {
@@ -89,6 +112,8 @@ final class Preferences {
     var blocksAdsAndTrackers: Bool { didSet { save(blocksAdsAndTrackers, Key.blocksAds) } }
     /// Sites (without `www.`) where ads and trackers load, sorted.
     var adsAllowedSites: [String] { didSet { save(adsAllowedSites, Key.adsAllowedSites) } }
+    /// How long a tab stays off screen before it sleeps.
+    var tabSleepDelay: TabSleepDelay { didSet { save(tabSleepDelay.rawValue, Key.tabSleepDelay) } }
 
     @ObservationIgnored private let defaults: UserDefaults?
 
@@ -100,6 +125,7 @@ final class Preferences {
         static let onboarding = "hasCompletedOnboarding"
         static let blocksAds = "blocksAdsAndTrackers"
         static let adsAllowedSites = "adsAllowedSites"
+        static let tabSleepDelay = "tabSleepDelayMinutes"
     }
 
     init(defaults: UserDefaults? = nil) {
@@ -111,6 +137,7 @@ final class Preferences {
         hasCompletedOnboarding = defaults?.bool(forKey: Key.onboarding) ?? false
         blocksAdsAndTrackers = defaults?.object(forKey: Key.blocksAds) as? Bool ?? true
         adsAllowedSites = defaults?.stringArray(forKey: Key.adsAllowedSites) ?? []
+        tabSleepDelay = (defaults?.object(forKey: Key.tabSleepDelay) as? Int).flatMap(TabSleepDelay.init) ?? .oneHour
     }
 
     private func save(_ value: Any, _ key: String) {

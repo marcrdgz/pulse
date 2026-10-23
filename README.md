@@ -16,7 +16,8 @@ A native macOS browser built on WebKit, with Arc's look and keyboard-first workf
   space, "Copy Image Address", searches with your engine, and Copy URL, Share and Print on the page.
   Tabs can be duplicated, closed below or closed with all others; pinned tabs can keep the current page.
   Downloads and history rows have their own menus.
-- Session restore; tabs load lazily when first shown.
+- Session restore; tabs load lazily when first shown, and tabs off screen for an hour (configurable)
+  sleep to free memory, waking up with their back/forward history. Faded icons mark sleeping tabs.
 - Find in page and a native error page when a site can't load.
 - Links to other apps (`mailto:`, `zoommtg:`…) open in that app, asking first unless clicked; sign-in
   prompts for HTTP Basic/Digest auth and JavaScript `prompt()` dialogs.

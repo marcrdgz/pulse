@@ -5,7 +5,7 @@ struct PulseApp: App {
     @State private var browser: Browser = {
         let preferences = Preferences(defaults: .standard)
         let supportDirectory = URL.applicationSupportDirectory.appending(path: "Pulse", directoryHint: .isDirectory)
-        return Browser(
+        let browser = Browser(
             sessionStore: .standard,
             history: .standard(),
             sitePermissions: SitePermissionStore(defaults: .standard),
@@ -13,6 +13,8 @@ struct PulseApp: App {
             contentBlocker: ContentBlocker(store: .default(), defaults: .standard, preferences: preferences),
             preferences: preferences
         )
+        browser.startHibernatingInactiveTabs()
+        return browser
     }()
 
     var body: some Scene {

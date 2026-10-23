@@ -149,6 +149,8 @@ struct FaviconView: View {
                     .opacity(0.6)
             }
         }
+        // Like Chrome's Memory Saver, a sleeping tab's icon fades until it's shown again.
+        .opacity(tab.isHibernated ? 0.45 : 1)
         .frame(width: size, height: size)
     }
 }
