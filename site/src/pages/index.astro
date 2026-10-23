@@ -1,89 +1,422 @@
 ---
 import Base from '../layouts/Base.astro';
-import BrowserMock from '../components/BrowserMock.astro';
+import Keys from '../components/Keys.astro';
+import Mark from '../components/Mark.astro';
+import Screen from '../components/Screen.astro';
+import type { Scene } from '../scripts/screen';
 
 const base = import.meta.env.BASE_URL.replace(/\/$/, '');
+const repoUrl = 'https://github.com/marcrdgz/pulse';
 
-const features = [
+const spaces = [
+  { id: 'personal', name: 'Personal', key: '⌃1' },
+  { id: 'work', name: 'Work', key: '⌃2' },
+  { id: 'reading', name: 'Reading', key: '⌃3' },
+];
+
+// The headline rises in word by word; each word carries its place in the sequence.
+const headline = [['Arc', 'was', 'a', 'good', 'idea.'], ['So', 'we', 'kept', 'it']];
+
+const tour: { note: string; keys?: string; title: string; body: string; space: string; scene: Scene }[] = [
   {
-    title: 'Spaces',
-    body: 'Separate sidebars with their own color, pinned and Today tabs. Favorites are shared. Switch with ⌃1…⌃9, the dots or a two-finger swipe.',
+    note: '⌃1 … ⌃9',
+    keys: '⌃1',
+    title: 'Spaces, each in its own colour.',
+    body: 'Work, home and reading get their own sidebar, pinned tabs and colour. Favorites come along to every space. Switch with a shortcut, the dots or a two-finger swipe.',
+    space: 'personal',
+    scene: '',
   },
   {
-    title: 'Command bar',
-    body: "⌘T or ⌘L opens an address bar that completes the sites you visit often, ranked by frequency and recency, alongside open tabs and suggestions.",
+    note: '⌘T',
+    keys: '⌘T',
+    title: 'One field for everything.',
+    body: 'Type a few letters and Pulse completes the site you meant, from the ones you visit most. Open tabs and search suggestions show up in the same list. ⇥ accepts.',
+    space: 'work',
+    scene: 'command',
   },
   {
-    title: 'Native WebKit',
-    body: 'A real macOS app built in Swift on WebKit. No Chromium, no Electron.',
+    note: '⌘S',
+    keys: '⌘S',
+    title: 'The whole page, when you want it.',
+    body: 'Hide the sidebar and the page goes edge to edge. Move to the left edge and it peeks back in.',
+    space: 'reading',
+    scene: 'collapsed',
   },
   {
-    title: 'Keyboard-first',
-    body: 'Every common action has a shortcut, from pinning tabs to reopening closed ones, find in page and the Web Inspector.',
+    note: 'drag',
+    title: 'Tabs go where you drop them.',
+    body: 'Reorder them, or move them between Favorites, Pinned and Today. Drop a tab on a space’s dot to send it there.',
+    space: 'work',
+    scene: 'drag',
   },
   {
-    title: 'Easy switch from Chrome',
-    body: 'First launch imports your Chrome history and bookmarks bar and offers to make Pulse the default browser.',
-  },
-  {
-    title: 'The details you expect',
-    body: 'Session restore with lazy tabs, a downloads bubble with pause and retry, history grouped by day and per-site camera and microphone permissions.',
+    note: 'first launch',
+    title: 'Bring your Chrome with you.',
+    body: 'Pulse imports your Chrome history and bookmarks bar, and offers to become your default browser. Context menus, downloads and history work the way you’re used to.',
+    space: 'personal',
+    scene: 'import',
   },
 ];
 
-const shortcuts = [
-  ['⌘T', 'New tab'],
-  ['⌘L', 'Edit current URL'],
-  ['⌘D', 'Pin or unpin tab'],
-  ['⌃1…⌃9', 'Switch space'],
-  ['⌘S', 'Toggle sidebar'],
-  ['⌘⇧T', 'Reopen closed tab'],
-];
+const shortcutGroups = [
+  {
+    title: 'Tabs',
+    shortcuts: [
+      { combos: ['⌘T'], action: 'New tab' },
+      { combos: ['⌘W'], action: 'Close tab' },
+      { combos: ['⌘⇧T'], action: 'Reopen closed tab' },
+      { combos: ['⌘D'], action: 'Pin or unpin tab' },
+      { combos: ['⌘1', '⌘8'], joiner: 'to', action: 'Go to tab 1 to 8' },
+      { combos: ['⌃⇥', '⌃⇧⇥'], action: 'Next or previous tab' },
+    ],
+  },
+  {
+    title: 'Spaces and sidebar',
+    shortcuts: [
+      { combos: ['⌃1', '⌃9'], joiner: 'to', action: 'Go to space 1 to 9' },
+      { combos: ['⌘⌥←', '⌘⌥→'], action: 'Previous or next space' },
+      { combos: ['⌘S'], action: 'Show or hide the sidebar' },
+    ],
+  },
+  {
+    title: 'Pages',
+    shortcuts: [
+      { combos: ['⌘L'], action: 'Edit the address' },
+      { combos: ['⌘[', '⌘]'], action: 'Back or forward' },
+      { combos: ['⌘R'], action: 'Reload' },
+      { combos: ['⌘⇧C'], action: 'Copy the address' },
+      { combos: ['⌘F'], action: 'Find on page' },
+      { combos: ['⌘G', '⌘⇧G'], action: 'Next or previous match' },
+    ],
+  },
+  {
+    title: 'Everything else',
+    shortcuts: [
+      { combos: ['⌘Y'], action: 'History' },
+      { combos: ['⌘⇧J'], action: 'Downloads' },
+      { combos: ['⌘⇧⌫'], action: 'Clear browsing data' },
+      { combos: ['⌘⌥I'], action: 'Web Inspector' },
+      { combos: ['⌘,'], action: 'Settings' },
+    ],
+  },
+] satisfies { title: string; shortcuts: { combos: string[]; joiner?: 'or' | 'to'; action: string }[] }[];
 ---
 
 <Base>
-  <section class="hero container">
-    <img class="hero-icon" src={`${base}/favicon.svg`} alt="" width="88" height="88" />
-    <h1>A calm, native browser for macOS</h1>
-    <p class="lede">
-      Pulse is built on WebKit, with Arc's look and a keyboard-first workflow. Spaces, a
-      sidebar for your tabs and a command bar that knows where you're going.
-    </p>
-    <div class="actions">
-      <a class="button primary" href={`${base}/download`}>Download for Mac</a>
-      <a class="button" href="https://github.com/marcrdgz/pulse">View on GitHub</a>
-    </div>
-    <p class="fine">Free and open source · macOS 14 or later</p>
-    <div class="hero-visual">
-      <BrowserMock />
-    </div>
-  </section>
+  <section class="intro">
 
-  <section id="features" class="container section">
-    <h2>Everything in its place</h2>
-    <div class="feature-grid">
-      {
-        features.map((feature) => (
-          <article class="card">
-            <h3>{feature.title}</h3>
-            <p>{feature.body}</p>
-          </article>
-        ))
-      }
+    <div class="container intro-text">
+      <h1>
+        {
+          headline.map((line, lineIndex) => (
+            <>
+              {line.map((word, wordIndex) => (
+                <>
+                  <span class="word" style={`--i:${lineIndex * headline[0].length + wordIndex}`}>
+                    {word}
+                  </span>{' '}
+                </>
+              ))}
+              {lineIndex === 0 && <br />}
+            </>
+          ))
+        }<span class="word" style={`--i:${headline.flat().length}`}><span class="gradient-text">open source</span>.</span>
+      </h1>
+      <p class="lede">
+        Pulse is a free, native Mac browser built on WebKit. Your tabs live in spaces, and one
+        command bar takes you anywhere, all from the keyboard.
+      </p>
+      <div class="actions">
+        <a class="button primary" href={`${base}/download`}>Download for Mac</a>
+        <a class="text-link" href={repoUrl}>View the source ›</a>
+      </div>
+      <p class="fine">Free and open source, for macOS 14 or later.</p>
     </div>
-  </section>
 
-  <section class="container section">
-    <h2>Hands on the keyboard</h2>
-    <dl class="shortcuts">
-      {
-        shortcuts.map(([keys, action]) => (
-          <div>
-            <dt><kbd>{keys}</kbd></dt>
-            <dd>{action}</dd>
+    <div class="container-wide">
+      <figure class="taped" data-hero>
+        <span class="tape left"></span>
+        <span class="tape right"></span>
+        <Screen class="hero-screen" />
+        <figcaption class="controls">
+          <span class="note hint">go on, press ⌃2</span>
+          <div class="pills" role="group" aria-label="Spaces">
+            {
+              spaces.map((space) => (
+                <button type="button" class="pill" data-space-button={space.id} aria-pressed={space.id === 'work' ? 'true' : 'false'}>
+                  <kbd>{space.key}</kbd>
+                  {space.name}
+                </button>
+              ))
+            }
           </div>
+          <button type="button" class="pill" data-command-button aria-pressed="false">
+            <kbd>⌘T</kbd>
+            Command bar
+          </button>
+          <button type="button" class="demo-toggle" data-demo-toggle hidden>Pause demo</button>
+          <p class="visually-hidden" aria-live="polite" data-status></p>
+        </figcaption>
+      </figure>
+    </div>
+  </section>
+
+  <section id="features" class="section">
+    <header class="container section-head">
+      <h2>You already know<br />where everything is<span class="flare">.</span></h2>
+      <p>Spaces, the sidebar and the ⌘T field, the way your hands remember them.</p>
+    </header>
+
+    <div class="container tour">
+      <ol class="tour-steps">
+        {
+          tour.map((step) => (
+            <li class="tour-step" data-step-space={step.space} data-step-scene={step.scene} data-step-keys={step.keys}>
+              <span class="note">{step.note}</span>
+              <h3>{step.title}</h3>
+              <p>{step.body}</p>
+            </li>
+          ))
+        }
+      </ol>
+      <div class="tour-stage">
+        <Screen class="tour-screen" space={tour[0].space} />
+      </div>
+    </div>
+  </section>
+
+  <section class="section">
+    <header class="container section-head">
+      <h2>Built for every day<span class="flare">.</span></h2>
+      <p>The parts of a browser you use without thinking, done the way a Mac app should.</p>
+    </header>
+
+    <div class="container bento">
+      <article class="tile wide">
+        <div class="stack" aria-hidden="true">
+          <span>Pulse, in Swift</span>
+          <span>WebKit</span>
+          <span>macOS</span>
+        </div>
+        <h3>WebKit, not Chromium.</h3>
+        <p>Pulse runs on the engine already inside your Mac, the one Safari uses. No Electron, no second copy of Chrome to download and update.</p>
+      </article>
+
+      <article class="tile wide">
+        <div class="downloads" aria-hidden="true">
+          <div class="dl"><b>pulse-notes.pdf</b><small>2.4 of 3.1 MB</small><span class="bar"><i style="width:78%"></i></span></div>
+          <div class="dl"><b>holiday-photos.zip</b><small>Paused</small><span class="bar"><i style="width:34%"></i></span></div>
+        </div>
+        <h3>Downloads, like Chrome’s.</h3>
+        <p>A bubble with progress, pause, resume and retry, and a page at ⌘⇧J that remembers what you downloaded.</p>
+      </article>
+
+      <article class="tile">
+        <div class="history" aria-hidden="true">
+          <small>Today</small><span>Release notes</span><span>Lemon pasta, ten minutes</span>
+          <small>Yesterday</small><span>Flight to Lisbon</span>
+        </div>
+        <h3>History, by day.</h3>
+        <p>⌘Y groups it by day, with search and multi-select delete. Recently closed tabs live in the History menu.</p>
+      </article>
+
+      <article class="tile">
+        <div class="permissions" aria-hidden="true">
+          <span><i class="cam"></i>meet.example.com</span>
+          <span>Camera <b class="toggle on"></b></span>
+          <span>Microphone <b class="toggle"></b></span>
+        </div>
+        <h3>Camera and mic, per site.</h3>
+        <p>Tabs show a red camera or microphone while a site uses them. You decide which sites can.</p>
+      </article>
+
+      <article class="tile">
+        <div class="ask" aria-hidden="true">
+          <b>Open “zoom.us”?</b>
+          <span><i>Cancel</i><i class="go">Open</i></span>
+        </div>
+        <h3>Asks before leaving.</h3>
+        <p>Links for Mail, Zoom and other apps open there, and Pulse asks first unless you clicked them.</p>
+      </article>
+    </div>
+
+    <p class="container small-things">
+      <span class="note">and the small things:</span> find in page, session restore that loads tabs
+      only when you open them, renaming tabs with a double-click, middle-click to close, link previews
+      in the corner, VoiceOver labels and fades when Reduce Motion is on.
+    </p>
+  </section>
+
+  <section id="shortcuts" class="section">
+    <header class="container section-head">
+      <h2>Every shortcut<span class="flare">.</span></h2>
+      <p>The Chrome shortcuts your hands already know, plus a few for spaces.</p>
+    </header>
+    <div class="container shortcut-groups">
+      {
+        shortcutGroups.map((group) => (
+          <section class="shortcut-group">
+            <h3>{group.title}</h3>
+            <dl>
+              {group.shortcuts.map((shortcut) => (
+                <div>
+                  <dt>
+                    <Keys combos={shortcut.combos} joiner={shortcut.joiner} />
+                  </dt>
+                  <dd>{shortcut.action}</dd>
+                </div>
+              ))}
+            </dl>
+          </section>
         ))
       }
-    </dl>
+    </div>
+  </section>
+
+  <section class="section">
+    <div class="band">
+      <div class="container closing">
+        <Mark variant="white" size={96} />
+        <h2>Go on. It’s free.</h2>
+        <div class="actions">
+          <a class="button on-band" href={`${base}/download`}>Download for Mac</a>
+          <a class="text-link" href={repoUrl}>View the source ›</a>
+        </div>
+        <p class="fine">Open source under the AGPL-3.0, for macOS 14 or later.</p>
+      </div>
+    </div>
   </section>
 </Base>
+
+<script>
+  import { showKeystroke, showScene, showSpace, type Scene } from '../scripts/screen';
+
+  const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
+
+  const hero = document.querySelector<HTMLElement>('[data-hero]');
+  if (hero) {
+    const screen = hero.querySelector<HTMLElement>('[data-screen]')!;
+    const spaceButtons = [...hero.querySelectorAll<HTMLButtonElement>('[data-space-button]')];
+    const commandButton = hero.querySelector<HTMLButtonElement>('[data-command-button]')!;
+    const demoToggle = hero.querySelector<HTMLButtonElement>('[data-demo-toggle]')!;
+    const status = hero.querySelector<HTMLElement>('[data-status]')!;
+
+    // Only actions someone took are announced; the demo plays silently.
+    const pickSpace = (index: number, announce: boolean) => {
+      const button = spaceButtons[index];
+      showSpace(screen, button.dataset.spaceButton!);
+      showKeystroke(screen, `⌃${index + 1}`);
+      spaceButtons.forEach((other) => other.setAttribute('aria-pressed', String(other === button)));
+      if (announce) status.textContent = `${button.textContent?.replace(/⌃\d/, '').trim()} space`;
+    };
+
+    const toggleCommandBar = (open: boolean, announce: boolean) => {
+      showScene(screen, open ? 'command' : '');
+      showKeystroke(screen, open ? '⌘T' : 'esc');
+      commandButton.setAttribute('aria-pressed', String(open));
+      if (announce) status.textContent = open ? 'Command bar open: typing “git” completes to github.com/marcrdgz/pulse' : '';
+    };
+
+    const toggleSidebar = (hidden: boolean) => {
+      showScene(screen, hidden ? 'collapsed' : '');
+      showKeystroke(screen, '⌘S');
+    };
+
+    // The hero plays Pulse's shortcuts on its own until someone takes over.
+    const demo: { run: () => void; hold: number }[] = [
+      { run: () => pickSpace(0, false), hold: 1800 },
+      { run: () => pickSpace(2, false), hold: 1800 },
+      { run: () => toggleCommandBar(true, false), hold: 3000 },
+      { run: () => toggleCommandBar(false, false), hold: 900 },
+      { run: () => toggleSidebar(true), hold: 1900 },
+      { run: () => toggleSidebar(false), hold: 1200 },
+      { run: () => pickSpace(1, false), hold: 2600 },
+    ];
+    let demoStep = 0;
+    let demoTimer: number | undefined;
+    let playing = !reduceMotion.matches;
+    let onScreen = true;
+
+    const schedule = (delay: number) => {
+      window.clearTimeout(demoTimer);
+      demoTimer = undefined;
+      if (!playing || !onScreen || document.hidden) return;
+      demoTimer = window.setTimeout(() => {
+        const step = demo[demoStep];
+        demoStep = (demoStep + 1) % demo.length;
+        step.run();
+        schedule(step.hold);
+      }, delay);
+    };
+
+    const setPlaying = (play: boolean) => {
+      playing = play;
+      demoToggle.textContent = play ? 'Pause demo' : 'Play demo';
+      schedule(play ? 600 : 0);
+    };
+
+    // Taking over stops the demo for good, so it never fights the visitor.
+    const takeOver = () => {
+      if (playing) setPlaying(false);
+    };
+
+    spaceButtons.forEach((button, index) =>
+      button.addEventListener('click', () => {
+        takeOver();
+        pickSpace(index, true);
+      }),
+    );
+    commandButton.addEventListener('click', () => {
+      takeOver();
+      toggleCommandBar(screen.dataset.scene !== 'command', true);
+    });
+    demoToggle.addEventListener('click', () => setPlaying(!playing));
+
+    // ⌃1…⌃3 mirror Pulse's own space shortcuts; ⌘T stays with the host browser, which won't yield it.
+    document.addEventListener('keydown', (event) => {
+      if (event.key === 'Escape' && screen.dataset.scene === 'command') {
+        takeOver();
+        return toggleCommandBar(false, true);
+      }
+      if (!event.ctrlKey || event.metaKey || event.altKey) return;
+      const index = Number(event.key) - 1;
+      if (!spaceButtons[index]) return;
+      event.preventDefault();
+      takeOver();
+      pickSpace(index, true);
+    });
+
+    if (!reduceMotion.matches) {
+      demoToggle.hidden = false;
+      // Let the page-load sequence finish before the first shortcut; the observer's first
+      // callback then starts the demo if the screen is still in view.
+      window.setTimeout(() => {
+        new IntersectionObserver(([entry]) => {
+          onScreen = entry.isIntersecting;
+          schedule(800);
+        }).observe(screen);
+        document.addEventListener('visibilitychange', () => schedule(800));
+      }, 1800);
+    }
+  }
+
+  // The tour's screen follows whichever step is crossing the middle of the viewport.
+  const tourScreen = document.querySelector<HTMLElement>('.tour-screen');
+  const steps = document.querySelectorAll<HTMLElement>('[data-step-space]');
+  if (tourScreen) {
+    const observer = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) {
+          if (!entry.isIntersecting) continue;
+          const step = entry.target as HTMLElement;
+          steps.forEach((other) => other.classList.toggle('current', other === step));
+          showSpace(tourScreen, step.dataset.stepSpace!);
+          if (step.dataset.stepKeys) showKeystroke(tourScreen, step.dataset.stepKeys);
+          if (tourScreen.dataset.scene !== step.dataset.stepScene) showScene(tourScreen, step.dataset.stepScene as Scene);
+        }
+      },
+      { rootMargin: '-45% 0px -45% 0px' },
+    );
+    steps.forEach((step) => observer.observe(step));
+  }
+</script>
