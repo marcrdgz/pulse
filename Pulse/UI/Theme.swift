@@ -63,8 +63,11 @@ struct SidebarIconButtonStyle: ButtonStyle {
             configuration.label
                 .frame(minWidth: size, minHeight: size)
                 .background(
+                    // Fades rather than snapping, and lighter than a tab row's hover.
                     RoundedRectangle(cornerRadius: 6, style: .continuous)
-                        .fill(isHovered && isEnabled ? Theme.hoverFill : .clear)
+                        .fill(Theme.hoverFill)
+                        .opacity(isHovered && isEnabled ? 0.7 : 0)
+                        .animation(.easeOut(duration: 0.15), value: isHovered)
                 )
                 .contentShape(Rectangle())
                 .opacity(isEnabled ? (configuration.isPressed ? 0.6 : 1) : 0.35)
