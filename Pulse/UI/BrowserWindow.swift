@@ -9,21 +9,21 @@ struct BrowserWindow: View {
     @State private var shortcutMonitor: Any?
     /// Shared by the sidebar and the page, which takes tabs dragged onto it into a split view.
     @State private var dragController = SidebarDragController()
+    /// Shared by the sidebar, which the swipe drags, and the window background, whose color follows it.
+    @State private var swipeTracker = SpaceSwipeTracker()
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         ZStack(alignment: .leading) {
-            // Cross-fades between spaces' themes; gradients don't interpolate their colors.
-            Theme.sidebarGradient(browser.sidebarTheme)
-                .id(browser.sidebarTheme)
-                .transition(.opacity)
-                .animation(.easeInOut(duration: 0.35), value: browser.sidebarTheme)
+            SpaceBackground()
+                .environment(swipeTracker)
             WindowDragArea()
 
             HStack(spacing: 0) {
                 if browser.isSidebarExpanded {
                     SidebarView()
                         .environment(dragController)
+                        .environment(swipeTracker)
                         .frame(width: sidebarWidth)
                         .overlay(alignment: .trailing) {
                             SidebarResizeHandle(width: $sidebarWidth)
@@ -197,8 +197,9 @@ struct BrowserWindow: View {
     private var sidebarPeek: some View {
         SidebarView()
             .environment(dragController)
+            .environment(swipeTracker)
             .frame(width: sidebarWidth)
-            .background(Theme.sidebarGradient(browser.sidebarTheme))
+            .background(SpaceBackground().environment(swipeTracker))
             .clipShape(RoundedRectangle(cornerRadius: Theme.contentCornerRadius, style: .continuous))
             .shadow(color: .black.opacity(0.25), radius: 12, x: 2)
             .padding(.vertical, Theme.contentInset)
@@ -496,5 +497,37 @@ private struct SidebarResizeHandle: View {
                     }
                     .onEnded { _ in widthAtDragStart = nil }
             )
+    }
+}
+
+/// The active space's colors behind the window. Every space has a layer, faded in by how far
+/// the space position has reached it, so a swipe blends the colors as the fingers move and
+/// settling continues that blend instead of starting a new one; gradients don't interpolate.
+private struct SpaceBackground: View {
+    @Environment(Browser.self) private var browser
+    @Environment(SpaceSwipeTracker.self) private var swipeTracker
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    var body: some View {
+        let index = browser.activeSpaceIndex
+        let position = reduceMotion ? CGFloat(index) : swipeTracker.position(from: index, spaceCount: browser.spaces.count)
+        ZStack {
+            ForEach(Array(browser.spaces.enumerated()), id: \.element.id) { offset, space in
+                Theme.sidebarGradient(space.theme)
+                    .id(space.theme)
+                    .transition(.opacity)
+                    .animation(.easeInOut(duration: 0.35), value: space.theme)
+                    // The first layer stays opaque so a blend never shows the window through it.
+                    .opacity(offset == 0 ? 1 : min(max(position - CGFloat(offset - 1), 0), 1))
+            }
+            if let draft = browser.spaceDraft {
+                Theme.sidebarGradient(draft.theme)
+                    .id(draft.theme)
+                    .transition(.opacity)
+            }
+        }
+        .animation(.easeInOut(duration: 0.35), value: browser.spaceDraft?.theme)
+        // Matches the sidebar's slide, so the color lands with the space; a fade still suits reduced motion.
+        .animation(reduceMotion ? .easeInOut(duration: 0.35) : .snappy(duration: 0.3), value: browser.activeSpaceID)
     }
 }

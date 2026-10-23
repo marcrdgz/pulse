@@ -220,7 +220,9 @@ final class SpaceSwipeTracker {
     /// How far the fingers have dragged the spaces sideways; negative reveals the space to the right.
     private var translation: CGFloat = 0
     @ObservationIgnored private var vertical: CGFloat = 0
-    @ObservationIgnored private var isHorizontal: Bool?
+    /// Observed: views that read the position before the swipe was recognized must hear when it is.
+    private var isHorizontal: Bool?
+    @ObservationIgnored private var pageWidth: CGFloat = 1
     /// Points per second of the latest movement, so a quick flick switches without a long drag.
     @ObservationIgnored private var velocity: CGFloat = 0
     @ObservationIgnored private var lastTimestamp: TimeInterval = 0
@@ -228,6 +230,7 @@ final class SpaceSwipeTracker {
     /// Returns the space offset to settle on (0 to snap back) when a horizontal swipe ends, otherwise `nil`.
     func track(_ event: NSEvent, pageWidth: CGFloat) -> Int? {
         guard event.hasPreciseScrollingDeltas else { return nil }
+        self.pageWidth = max(pageWidth, 1)
         switch event.phase {
         case .mayBegin, .began:
             translation = 0
@@ -272,8 +275,15 @@ final class SpaceSwipeTracker {
         isHorizontal == true && event.hasPreciseScrollingDeltas && !(event.phase.isEmpty && event.momentumPhase.isEmpty)
     }
 
-    /// The drag to show; empty until the gesture is known to be a horizontal swipe.
-    var dragOffset: CGFloat {
-        isHorizontal == true ? translation : 0
+    /// The space the swipe has reached, fractional mid-swipe, so the spaces and their colors
+    /// follow the fingers. It resists past the first and last space, since switching doesn't wrap.
+    func position(from activeIndex: Int, spaceCount: Int) -> CGFloat {
+        let index = CGFloat(activeIndex)
+        guard isHorizontal == true else { return index }
+        let position = index - translation / pageWidth
+        let last = CGFloat(spaceCount - 1)
+        if position < 0 { return position / 4 }
+        if position > last { return last + (position - last) / 4 }
+        return position
     }
 }

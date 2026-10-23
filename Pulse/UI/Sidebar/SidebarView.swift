@@ -5,7 +5,7 @@ struct SidebarView: View {
     @Environment(Browser.self) private var browser
     /// Owned by the window: the page takes tabs dropped on it, and the ghost is drawn above it.
     @Environment(SidebarDragController.self) private var dragController
-    @State private var swipeTracker = SpaceSwipeTracker()
+    @Environment(SpaceSwipeTracker.self) private var swipeTracker
     @State private var frame: CGRect = .zero
     @State private var eventMonitors: [Any] = []
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -49,19 +49,15 @@ struct SidebarView: View {
                 }
             }
             .frame(width: proxy.size.width * CGFloat(browser.spaces.count), alignment: .leading)
-            .offset(x: -proxy.size.width * CGFloat(browser.activeSpaceIndex) + dragOffset)
+            .offset(x: -proxy.size.width * spacePosition)
             .animation(reduceMotion ? nil : .snappy(duration: 0.3), value: browser.activeSpaceID)
         }
         .clipped()
     }
 
-    /// The swipe in progress, resisting past the first and last space since switching doesn't wrap.
-    private var dragOffset: CGFloat {
-        guard !reduceMotion else { return 0 }
-        let offset = swipeTracker.dragOffset
+    private var spacePosition: CGFloat {
         let index = browser.activeSpaceIndex
-        let hasNeighbor = offset < 0 ? index < browser.spaces.count - 1 : index > 0
-        return hasNeighbor ? offset : offset / 4
+        return reduceMotion ? CGFloat(index) : swipeTracker.position(from: index, spaceCount: browser.spaces.count)
     }
 
     /// Events SwiftUI has no gestures for: middle-click closes the tab under the pointer,
