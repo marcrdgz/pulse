@@ -83,6 +83,8 @@ enum ChromeWebStorePage {
         }
     }
 
+    /// Kept below 142.0.7430: from there the store stops checking the user agent and trusts a
+    /// server-side flag instead, which leaves the button disabled outside real Chrome.
     private static let chromeVersion = "140.0.0.0"
     private static let chromeUserAgent =
         "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/\(chromeVersion) Safari/537.36"
