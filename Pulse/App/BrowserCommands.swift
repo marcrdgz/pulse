@@ -44,8 +44,15 @@ struct BrowserCommands: Commands {
                 .disabled(!browser.canReopenClosedTab)
         }
 
-        // The system "Close" item also binds ⌘W and would win over "Close Tab", closing the only window.
-        CommandGroup(replacing: .saveItem) {}
+        // Grouped only to stay within the builder's limit of ten items.
+        Group {
+            // The system "Close" item also binds ⌘W and would win over "Close Tab", closing the only window.
+            CommandGroup(replacing: .saveItem) {}
+
+            CommandGroup(replacing: .importExport) {
+                Button("Import from Chrome…", action: browser.showChromeImport)
+            }
+        }
 
         CommandGroup(after: .textEditing) {
             Divider()

@@ -45,6 +45,9 @@ final class Browser {
     /// The space whose name is being edited in the sidebar.
     private(set) var renamingSpaceID: Space.ID?
     var isClearBrowsingDataPresented = false
+    /// Shown on the very first launch, before any session exists.
+    var isOnboardingPresented = false
+    var isChromeImportPresented = false
     /// Chrome's download bubble, anchored to the sidebar's downloads button.
     var isDownloadsBubblePresented = false
     /// Sites waiting for a camera/microphone answer, oldest first.
@@ -86,8 +89,10 @@ final class Browser {
         if let session = sessionStore?.load() {
             restore(session)
             if preferences.startupBehavior == .clearToday { clearToday() }
+        } else if sessionStore != nil, !preferences.hasCompletedOnboarding {
+            isOnboardingPresented = true
         }
-        if activeTab == nil {
+        if activeTab == nil, !isOnboardingPresented {
             commandBar = .newTab
         }
     }
@@ -269,6 +274,40 @@ final class Browser {
         }
     }
 
+    // MARK: Onboarding and import
+
+    func showChromeImport() {
+        isChromeImportPresented = true
+    }
+
+    /// Called however the onboarding closes, so it never shows again.
+    func finishOnboarding() {
+        isOnboardingPresented = false
+        preferences.hasCompletedOnboarding = true
+        if activeTab == nil { commandBar = .newTab }
+    }
+
+    /// Reads everything first, so a failure leaves the browser unchanged.
+    func importFromChrome(
+        _ profile: ChromeProfile,
+        history includesHistory: Bool,
+        bookmarks includesBookmarks: Bool
+    ) throws -> ChromeImportSummary {
+        let bookmarks = includesBookmarks ? try ChromeImport.bookmarkBar(of: profile) : []
+        var summary = ChromeImportSummary()
+        if includesHistory {
+            guard let history else { throw ChromeImportError.unreadableHistory }
+            let imported = try ChromeImport.withHistoryCopy(of: profile) { history.importChromeHistory(from: $0) }
+            guard imported else { throw ChromeImportError.unreadableHistory }
+            summary.importedHistory = true
+        }
+        if !bookmarks.isEmpty {
+            createSpace(named: "Chrome", pinning: bookmarks)
+            summary.bookmarkCount = bookmarks.count
+        }
+        return summary
+    }
+
     // MARK: Permissions
 
     /// The prompt to show: the oldest request from the visible tab.
@@ -410,12 +449,30 @@ final class Browser {
 
     @discardableResult
     func createSpace() -> Space {
-        let theme = SpaceTheme.allCases[spaces.count % SpaceTheme.allCases.count]
-        let space = Space(name: "Space \(spaces.count + 1)", theme: theme)
+        let space = Space(name: "Space \(spaces.count + 1)", theme: nextSpaceTheme)
         spaces.append(space)
         selectSpace(space)
         commandBar = .newTab
         return space
+    }
+
+    /// A new space with `bookmarks` as its pinned tabs, e.g. imported from another browser.
+    @discardableResult
+    func createSpace(named name: String, pinning bookmarks: [Bookmark]) -> Space {
+        let pinnedTabs = bookmarks.map { bookmark in
+            let tab = makeTab(url: bookmark.url, title: bookmark.title)
+            tab.pinnedURL = bookmark.url
+            tab.loadFavicon()
+            return tab
+        }
+        let space = Space(name: name, theme: nextSpaceTheme, pinnedTabs: pinnedTabs)
+        spaces.append(space)
+        selectSpace(space)
+        return space
+    }
+
+    private var nextSpaceTheme: SpaceTheme {
+        SpaceTheme.allCases[spaces.count % SpaceTheme.allCases.count]
     }
 
     func selectSpace(_ space: Space) {

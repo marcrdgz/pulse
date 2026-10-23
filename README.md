@@ -22,6 +22,8 @@ A native macOS browser built on WebKit, with Arc's look and keyboard-first workf
 - VoiceOver labels for sidebar controls, and fades instead of slides with Reduce Motion on.
 - Downloads like Chrome's: a bubble with progress, pause/resume, cancel and retry, and a ⌘⇧J page
   that remembers past downloads.
+- First-launch onboarding that imports Chrome's history and bookmarks bar (also File › Import from
+  Chrome…) and offers to make Pulse the default browser.
 - Settings (⌘,): startup behavior, default browser, search engine and suggestions, download
   location prompt, per-site camera/microphone permissions.
 - History like Chrome's: ⌘Y page grouped by day with search and multi-select delete, a History menu

@@ -64,6 +64,16 @@ struct BrowserWindow: View {
             ClearBrowsingDataView()
                 .environment(browser)
         }
+        .sheet(isPresented: Bindable(browser).isOnboardingPresented, onDismiss: browser.finishOnboarding) {
+            OnboardingView()
+                .environment(browser)
+        }
+        .sheet(isPresented: Bindable(browser).isChromeImportPresented) {
+            ChromeImportView(finishTitle: "Done") { browser.isChromeImportPresented = false }
+                .padding(24)
+                .frame(width: 440, height: 260)
+                .environment(browser)
+        }
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.willTerminateNotification)) { _ in
             browser.saveSession()
         }

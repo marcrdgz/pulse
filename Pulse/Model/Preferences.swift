@@ -85,6 +85,7 @@ final class Preferences {
     var showsSearchSuggestions: Bool { didSet { save(showsSearchSuggestions, Key.searchSuggestions) } }
     var startupBehavior: StartupBehavior { didSet { save(startupBehavior.rawValue, Key.startup) } }
     var asksWhereToSaveDownloads: Bool { didSet { save(asksWhereToSaveDownloads, Key.askDownloadLocation) } }
+    var hasCompletedOnboarding: Bool { didSet { save(hasCompletedOnboarding, Key.onboarding) } }
 
     @ObservationIgnored private let defaults: UserDefaults?
 
@@ -93,6 +94,7 @@ final class Preferences {
         static let searchSuggestions = "showsSearchSuggestions"
         static let startup = "startupBehavior"
         static let askDownloadLocation = "asksWhereToSaveDownloads"
+        static let onboarding = "hasCompletedOnboarding"
     }
 
     init(defaults: UserDefaults? = nil) {
@@ -101,6 +103,7 @@ final class Preferences {
         showsSearchSuggestions = defaults?.object(forKey: Key.searchSuggestions) as? Bool ?? true
         startupBehavior = defaults?.string(forKey: Key.startup).flatMap(StartupBehavior.init) ?? .continueWhereYouLeftOff
         asksWhereToSaveDownloads = defaults?.bool(forKey: Key.askDownloadLocation) ?? false
+        hasCompletedOnboarding = defaults?.bool(forKey: Key.onboarding) ?? false
     }
 
     private func save(_ value: Any, _ key: String) {

@@ -110,6 +110,40 @@ final class HistoryStore {
         execute("UPDATE urls SET typed_count = typed_count + 1 WHERE url = ?", [.text(url.absoluteString)])
     }
 
+    /// Merges a copy of Chrome's `History` database: web URLs with their counters, and their visits
+    /// except subframe loads. Importing the same history again adds nothing.
+    func importChromeHistory(from database: URL) -> Bool {
+        guard execute("ATTACH DATABASE ? AS chrome", [.text(database.path)]) else { return false }
+        defer { execute("DETACH DATABASE chrome") }
+        // Chrome stores microseconds since 1601-01-01.
+        let chromeTime = { (column: String) in "(\(column) / 1000000.0 - 11644473600)" }
+        execute("BEGIN")
+        let imported = execute("""
+            INSERT INTO main.urls (url, title, visit_count, typed_count, last_visit)
+            SELECT url, title, visit_count, typed_count, \(chromeTime("last_visit_time")) FROM chrome.urls
+            WHERE hidden = 0 AND last_visit_time > 0 AND (url LIKE 'http://%' OR url LIKE 'https://%')
+            ON CONFLICT(url) DO UPDATE SET
+                title = CASE WHEN urls.title = '' THEN excluded.title ELSE urls.title END,
+                visit_count = MAX(urls.visit_count, excluded.visit_count),
+                typed_count = MAX(urls.typed_count, excluded.typed_count),
+                last_visit = MAX(urls.last_visit, excluded.last_visit)
+            """) && execute("""
+            INSERT INTO main.visits (url_id, time)
+            SELECT pulse_urls.id, \(chromeTime("chrome_visits.visit_time"))
+            FROM chrome.visits AS chrome_visits
+            JOIN chrome.urls AS chrome_urls ON chrome_urls.id = chrome_visits.url
+            JOIN main.urls AS pulse_urls ON pulse_urls.url = chrome_urls.url
+            WHERE (chrome_visits.transition & 255) NOT IN (3, 4)
+            AND NOT EXISTS (
+                SELECT 1 FROM main.visits
+                WHERE url_id = pulse_urls.id AND time = \(chromeTime("chrome_visits.visit_time"))
+            )
+            """)
+        execute(imported ? "COMMIT" : "ROLLBACK")
+        revision += 1
+        return imported
+    }
+
     // MARK: Reading
 
     /// Newest first. Every whitespace-separated term must appear in the URL or title.
