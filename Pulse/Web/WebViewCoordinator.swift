@@ -9,6 +9,10 @@ final class WebViewCoordinator: NSObject, WKNavigationDelegate, WKUIDelegate {
         self.tab = tab
     }
 
+    func hoveredLinkDidChange(to link: String?) {
+        tab?.hoveredLinkDidChange(to: link)
+    }
+
     // MARK: WKNavigationDelegate
 
     func webView(

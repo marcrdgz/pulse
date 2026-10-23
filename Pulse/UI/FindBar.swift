@@ -24,14 +24,17 @@ struct FindBar: View {
                 Button { browser.findInPage(backwards: true) } label: {
                     Image(systemName: "chevron.up")
                 }
+                .accessibilityLabel("Previous Match")
                 .help("Previous Match (⌘⇧G)")
                 Button { browser.findInPage() } label: {
                     Image(systemName: "chevron.down")
                 }
+                .accessibilityLabel("Next Match")
                 .help("Next Match (⌘G)")
                 Button(action: browser.hideFindBar) {
                     Image(systemName: "xmark")
                 }
+                .accessibilityLabel("Close Find Bar")
                 .help("Close (esc)")
             }
             .buttonStyle(SidebarIconButtonStyle())

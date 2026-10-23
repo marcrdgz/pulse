@@ -17,6 +17,11 @@ struct FavoritesGrid: View {
                     ForEach(browser.favorites) { tab in
                         FavoriteTile(tab: tab, isActive: tab.id == browser.activeTabID)
                             .onTapGesture { browser.select(tab) }
+                            .accessibilityElement(children: .ignore)
+                            .accessibilityLabel(tab.displayTitle)
+                            .accessibilityValue(tab.mediaCaptureDescription ?? "")
+                            .accessibilityAddTraits(tab.id == browser.activeTabID ? [.isButton, .isSelected] : .isButton)
+                            .accessibilityAction { browser.select(tab) }
                             .contextMenu { TabContextMenu(tab: tab) }
                             .sidebarDraggable(tab)
                             .transition(.scale(scale: 0.8).combined(with: .opacity))
@@ -50,6 +55,11 @@ private struct FavoriteTile: View {
     var body: some View {
         FaviconView(tab: tab, size: 18)
             .frame(maxWidth: .infinity, minHeight: 44)
+            .overlay(alignment: .topTrailing) {
+                MediaCaptureIndicator(tab: tab)
+                    .font(.system(size: 8, weight: .semibold))
+                    .padding(5)
+            }
             .background(
                 RoundedRectangle(cornerRadius: 10, style: .continuous)
                     .fill(isActive || isHovered ? Theme.activeTabFill : Theme.pillFill)

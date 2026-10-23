@@ -21,6 +21,7 @@ struct SpaceSwitcher: View {
             }
             .buttonStyle(SidebarIconButtonStyle())
             .help("New Space")
+            .accessibilityLabel("New Space")
         }
         .frame(height: 28)
         .animation(.snappy(duration: 0.2), value: browser.activeSpaceID)
@@ -42,6 +43,8 @@ private struct SpaceDot: View {
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+        .accessibilityLabel(space.name)
+        .accessibilityAddTraits(isActive ? .isSelected : [])
         .contextMenu { SpaceContextMenu(space: space) }
     }
 }

@@ -14,6 +14,9 @@ A native macOS browser built on WebKit, with Arc's look and keyboard-first workf
 - Double-click a tab to rename it; middle-click to close it.
 - Session restore; tabs load lazily when first shown.
 - Find in page and a native error page when a site can't load.
+- Hovering a link previews its URL in the page's corner; tabs show a spinner while loading and a
+  red camera or microphone while a site uses them.
+- VoiceOver labels for sidebar controls, and fades instead of slides with Reduce Motion on.
 - Downloads like Chrome's: a bubble with progress, pause/resume, cancel and retry, and a ⌘⇧J page
   that remembers past downloads.
 - Settings (⌘,): startup behavior, default browser, search engine and suggestions, download

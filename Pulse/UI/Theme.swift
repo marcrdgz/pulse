@@ -66,6 +66,13 @@ struct SidebarIconButtonStyle: ButtonStyle {
     }
 }
 
+extension AnyTransition {
+    /// Slides in from `edge` while fading, or only fades when the user asked to reduce motion.
+    static func slide(from edge: Edge, reduceMotion: Bool) -> AnyTransition {
+        reduceMotion ? .opacity : .move(edge: edge).combined(with: .opacity)
+    }
+}
+
 private extension Color {
     static func dynamic(light: NSColor, dark: NSColor) -> Color {
         Color(nsColor: NSColor(name: nil) { appearance in

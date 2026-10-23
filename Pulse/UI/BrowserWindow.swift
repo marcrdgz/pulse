@@ -7,6 +7,7 @@ struct BrowserWindow: View {
     @State private var isPeekingSidebar = false
     @State private var peekTask: Task<Void, Never>?
     @State private var controlShortcutMonitor: Any?
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         ZStack(alignment: .leading) {
@@ -24,7 +25,7 @@ struct BrowserWindow: View {
                         .overlay(alignment: .trailing) {
                             SidebarResizeHandle(width: $sidebarWidth)
                         }
-                        .transition(.move(edge: .leading))
+                        .transition(reduceMotion ? .opacity : .move(edge: .leading))
                 }
                 content
             }
@@ -39,6 +40,7 @@ struct BrowserWindow: View {
 
             if let toast = browser.toast {
                 ToastView(message: toast)
+                    .transition(.slide(from: .bottom, reduceMotion: reduceMotion))
             }
         }
         .ignoresSafeArea()
@@ -93,17 +95,24 @@ struct BrowserWindow: View {
                     if browser.isFindBarVisible {
                         FindBar()
                             .padding(12)
-                            .transition(.move(edge: .top).combined(with: .opacity))
+                            .transition(.slide(from: .top, reduceMotion: reduceMotion))
                     }
                 }
                 .overlay(alignment: .topLeading) {
                     if let request = browser.activePermissionRequest {
                         PermissionPrompt(request: request)
                             .padding(12)
-                            .transition(.move(edge: .top).combined(with: .opacity))
+                            .transition(.slide(from: .top, reduceMotion: reduceMotion))
+                    }
+                }
+                .overlay(alignment: .bottomLeading) {
+                    if let link = tab.hoveredLink {
+                        LinkPreview(link: link)
+                            .transition(.opacity)
                     }
                 }
                 .animation(.snappy(duration: 0.2), value: browser.activePermissionRequest?.id)
+                .animation(.easeOut(duration: 0.12), value: tab.hoveredLink == nil)
         } else {
             EmptyStateView()
         }
@@ -132,7 +141,7 @@ struct BrowserWindow: View {
                 .shadow(color: .black.opacity(0.25), radius: 12, x: 2)
                 .padding(.vertical, Theme.contentInset)
                 .onHover { if !$0 { isPeekingSidebar = false } }
-                .transition(.move(edge: .leading).combined(with: .opacity))
+                .transition(.slide(from: .leading, reduceMotion: reduceMotion))
         }
     }
 
@@ -163,7 +172,7 @@ struct BrowserWindow: View {
             )
             .id(mode)
             .padding(.top, 120)
-            .transition(.scale(scale: 0.97, anchor: .top).combined(with: .opacity))
+            .transition(reduceMotion ? .opacity : .scale(scale: 0.97, anchor: .top).combined(with: .opacity))
         }
         .transition(.opacity)
     }
@@ -195,7 +204,29 @@ private struct ToastView: View {
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
             .padding(.bottom, 28)
             .allowsHitTesting(false)
-            .transition(.move(edge: .bottom).combined(with: .opacity))
+    }
+}
+
+/// The hovered link's URL in the page's bottom-left corner, like Chrome's status bubble.
+private struct LinkPreview: View {
+    let link: String
+
+    var body: some View {
+        Text(link)
+            .font(.system(size: 11))
+            .lineLimit(1)
+            .truncationMode(.middle)
+            .padding(.horizontal, 8)
+            .padding(.vertical, 4)
+            .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 6, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: 6, style: .continuous)
+                    .strokeBorder(.primary.opacity(0.1))
+            )
+            .frame(maxWidth: 480, alignment: .leading)
+            .padding(6)
+            .allowsHitTesting(false)
+            .accessibilityHidden(true)
     }
 }
 

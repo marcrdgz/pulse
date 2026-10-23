@@ -13,6 +13,10 @@ final class Tab: Identifiable {
     private(set) var canGoBack = false
     private(set) var canGoForward = false
     private(set) var loadError: LoadError?
+    /// The URL of the link under the pointer, previewed at the bottom of the page.
+    private(set) var hoveredLink: String?
+    private(set) var cameraCaptureState: WKMediaCaptureState = .none
+    private(set) var microphoneCaptureState: WKMediaCaptureState = .none
     /// The page a pinned tab returns to when closed; `nil` for today tabs.
     var pinnedURL: URL?
     /// Set by the user from the sidebar; overrides the page title.
@@ -41,6 +45,16 @@ final class Tab: Identifiable {
     var isPinned: Bool { pinnedURL != nil }
 
     var internalPage: InternalPage? { InternalPage(url: url) }
+
+    /// e.g. "Using camera and microphone"; `nil` while the page captures nothing.
+    var mediaCaptureDescription: String? {
+        let devices = [(cameraCaptureState, "camera"), (microphoneCaptureState, "microphone")]
+        let active = devices.filter { $0.0 == .active }.map(\.1)
+        let muted = devices.filter { $0.0 == .muted }.map(\.1)
+        if !active.isEmpty { return "Using " + active.joined(separator: " and ") }
+        if !muted.isEmpty { return "Paused " + muted.joined(separator: " and ") }
+        return nil
+    }
 
     var displayTitle: String {
         customTitle ?? internalPage?.title ?? (title.isEmpty ? (url.displayHost ?? "New Tab") : title)
@@ -113,6 +127,11 @@ final class Tab: Identifiable {
 
     func navigationDidStart() {
         loadError = nil
+        hoveredLink = nil
+    }
+
+    func hoveredLinkDidChange(to link: String?) {
+        hoveredLink = link
     }
 
     func navigationDidFail(with error: Error) {
@@ -145,8 +164,11 @@ final class Tab: Identifiable {
         loadedWebView = nil
         coordinator = nil
         loadError = nil
+        hoveredLink = nil
         isLoading = false
         estimatedProgress = 0
+        cameraCaptureState = .none
+        microphoneCaptureState = .none
         canGoBack = false
         canGoForward = false
     }
@@ -191,6 +213,8 @@ final class Tab: Identifiable {
             webView.observe(\.estimatedProgress) { [weak self] _, _ in MainActor.assumeIsolated { self?.syncWithWebView() } },
             webView.observe(\.canGoBack) { [weak self] _, _ in MainActor.assumeIsolated { self?.syncWithWebView() } },
             webView.observe(\.canGoForward) { [weak self] _, _ in MainActor.assumeIsolated { self?.syncWithWebView() } },
+            webView.observe(\.cameraCaptureState) { [weak self] _, _ in MainActor.assumeIsolated { self?.syncWithWebView() } },
+            webView.observe(\.microphoneCaptureState) { [weak self] _, _ in MainActor.assumeIsolated { self?.syncWithWebView() } },
         ]
         return webView
     }
@@ -213,6 +237,8 @@ final class Tab: Identifiable {
         estimatedProgress = webView.estimatedProgress
         canGoBack = webView.canGoBack
         canGoForward = webView.canGoForward
+        cameraCaptureState = webView.cameraCaptureState
+        microphoneCaptureState = webView.microphoneCaptureState
         if didChangePage { browser?.tabDidUpdate() }
     }
 
@@ -226,6 +252,7 @@ final class Tab: Identifiable {
         // Without a Safari token some sites (e.g. Google) serve degraded markup to WKWebView.
         configuration.applicationNameForUserAgent = "Version/26.0 Safari/605.1.15"
         configuration.preferences.isElementFullscreenEnabled = true
+        LinkHover.install(in: configuration.userContentController)
         return configuration
     }
 }

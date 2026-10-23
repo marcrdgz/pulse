@@ -27,6 +27,7 @@ struct DownloadsButton: View {
         }
         .buttonStyle(SidebarIconButtonStyle())
         .help("Downloads (⌘⇧J)")
+        .accessibilityLabel("Downloads")
         .popover(isPresented: $browser.isDownloadsBubblePresented, arrowEdge: .top) {
             DownloadsBubble()
                 .environment(browser)
@@ -141,6 +142,7 @@ struct DownloadRow: View {
                 .font(.system(size: 11, weight: .semibold))
         }
         .help(help)
+        .accessibilityLabel(help)
     }
 }
 

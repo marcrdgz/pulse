@@ -7,6 +7,7 @@ struct SidebarView: View {
     @State private var swipeTracker = SpaceSwipeTracker()
     @State private var frame: CGRect = .zero
     @State private var eventMonitors: [Any] = []
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
@@ -44,7 +45,7 @@ struct SidebarView: View {
             }
             .frame(width: proxy.size.width * CGFloat(browser.spaces.count), alignment: .leading)
             .offset(x: -proxy.size.width * CGFloat(browser.activeSpaceIndex))
-            .animation(.snappy(duration: 0.3), value: browser.activeSpaceID)
+            .animation(reduceMotion ? nil : .snappy(duration: 0.3), value: browser.activeSpaceID)
         }
         .clipped()
     }
@@ -105,15 +106,18 @@ private struct SidebarToolbar: View {
             Button(action: browser.toggleSidebar) {
                 Image(systemName: "sidebar.left")
             }
+            .accessibilityLabel("Toggle Sidebar")
             .help("Toggle Sidebar (⌘S)")
             Button { tab?.goBack() } label: {
                 Image(systemName: "arrow.left")
             }
+            .accessibilityLabel("Back")
             .disabled(!(tab?.canGoBack ?? false))
             .help("Back (⌘[)")
             Button { tab?.goForward() } label: {
                 Image(systemName: "arrow.right")
             }
+            .accessibilityLabel("Forward")
             .disabled(!(tab?.canGoForward ?? false))
             .help("Forward (⌘])")
             Button {
@@ -121,6 +125,7 @@ private struct SidebarToolbar: View {
             } label: {
                 Image(systemName: tab?.isLoading == true ? "xmark" : "arrow.clockwise")
             }
+            .accessibilityLabel(tab?.isLoading == true ? "Stop" : "Reload")
             .disabled(tab == nil)
             .help("Reload (⌘R)")
         }
