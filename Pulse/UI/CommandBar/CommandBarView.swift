@@ -33,51 +33,57 @@ struct CommandBarView: View {
     var body: some View {
         let result = result
         let suggestions = result.suggestions
+        let accent = Theme.swatch(browser.activeSpace.theme)
         VStack(spacing: 0) {
-            HStack(spacing: 12) {
-                Image(systemName: mode == .newTab ? "plus.magnifyingglass" : "magnifyingglass")
-                    .font(.system(size: 18))
-                    .foregroundStyle(.secondary)
-                OmniboxField(
-                    text: $text,
-                    displayOverride: selectedIndex > 0 && suggestions.indices.contains(selectedIndex)
-                        ? suggestions[selectedIndex].fillText : nil,
-                    inlineCompletion: result.inlineCompletion,
-                    placeholder: "Search or Enter URL…",
-                    selectsAllInitially: mode == .editActiveTab,
-                    onUserEdit: { isDeletion in
-                        hasEdited = true
-                        allowsInlineCompletion = !isDeletion
-                        selectedIndex = 0
-                    },
-                    onCommand: { handle($0, result: result) }
-                )
-            }
-            .padding(.horizontal, 18)
-            .frame(height: 58)
+            OmniboxField(
+                text: $text,
+                displayOverride: selectedIndex > 0 && suggestions.indices.contains(selectedIndex)
+                    ? suggestions[selectedIndex].fillText : nil,
+                inlineCompletion: result.inlineCompletion,
+                placeholder: "Search or Enter URL…",
+                selectsAllInitially: mode == .editActiveTab,
+                onUserEdit: { isDeletion in
+                    hasEdited = true
+                    allowsInlineCompletion = !isDeletion
+                    selectedIndex = 0
+                },
+                onCommand: { handle($0, result: result) }
+            )
+            .padding(.horizontal, 20)
+            .frame(height: 60)
 
             if !suggestions.isEmpty {
-                Divider()
+                Rectangle()
+                    .fill(.primary.opacity(0.08))
+                    .frame(height: 1)
+                    .padding(.horizontal, 12)
                 VStack(spacing: 2) {
                     ForEach(Array(suggestions.enumerated()), id: \.element.id) { index, suggestion in
                         SuggestionRow(
                             suggestion: suggestion,
                             isSelected: index == selectedIndex,
+                            accent: accent,
                             remove: removeAction(for: suggestion)
                         )
                         .onTapGesture { perform(suggestion) }
                     }
                 }
-                .padding(6)
+                .padding(8)
             }
         }
-        .frame(width: 640)
-        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
-        .overlay(
-            RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .strokeBorder(.white.opacity(0.15))
+        .frame(width: 680)
+        // Arc tints the bar with the active space's color.
+        .background(
+            LinearGradient(colors: [accent.opacity(0.12), .clear], startPoint: .top, endPoint: .bottom)
         )
-        .shadow(color: .black.opacity(0.3), radius: 30, y: 12)
+        .background(.thickMaterial)
+        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .strokeBorder(.white.opacity(0.18))
+        )
+        .shadow(color: .black.opacity(0.12), radius: 2, y: 1)
+        .shadow(color: .black.opacity(0.28), radius: 40, y: 20)
         .task(id: text) { await loadSearchSuggestions() }
     }
 
@@ -143,19 +149,27 @@ private struct SuggestionRow: View {
     @Environment(Browser.self) private var browser
     let suggestion: OmniboxSuggestion
     let isSelected: Bool
+    /// The active space's color, which fills the highlighted row as in Arc.
+    let accent: Color
     let remove: (() -> Void)?
     @State private var isHovered = false
 
     var body: some View {
-        HStack(spacing: 10) {
+        HStack(spacing: 12) {
             icon
                 .frame(width: 16, height: 16)
+                .frame(width: 28, height: 28)
+                .background(
+                    RoundedRectangle(cornerRadius: 7, style: .continuous)
+                        .fill(isSelected ? .white.opacity(0.25) : Color.primary.opacity(0.06))
+                )
             HStack(spacing: 0) {
                 Text(title)
+                    .fontWeight(.medium)
                     .lineLimit(1)
                 if let detail {
-                    Text(" – \(detail)")
-                        .foregroundStyle(.secondary)
+                    Text(" — \(detail)")
+                        .foregroundStyle(isSelected ? AnyShapeStyle(.white.opacity(0.75)) : AnyShapeStyle(.secondary))
                         .lineLimit(1)
                 }
             }
@@ -167,19 +181,27 @@ private struct SuggestionRow: View {
                 }
                 .buttonStyle(SidebarIconButtonStyle())
                 .help("Remove from History (⇧⌦)")
-            } else if let hint {
-                Text(hint)
-                    .font(.system(size: 11, weight: .medium))
-                    .foregroundStyle(.secondary)
-                    .opacity(isSelected || isTabSwitch ? 1 : 0)
+            } else if let hint, isSelected || isTabSwitch {
+                HStack(spacing: 6) {
+                    Text(hint)
+                    if isSelected {
+                        Image(systemName: "return")
+                            .font(.system(size: 10, weight: .semibold))
+                            .frame(width: 20, height: 18)
+                            .background(.white.opacity(0.25), in: RoundedRectangle(cornerRadius: 4, style: .continuous))
+                    }
+                }
+                .font(.system(size: 12, weight: .medium))
+                .foregroundStyle(isSelected ? AnyShapeStyle(.white.opacity(0.85)) : AnyShapeStyle(.tertiary))
             }
         }
         .font(.system(size: 14))
-        .padding(.horizontal, 12)
-        .frame(height: 36)
+        .foregroundStyle(isSelected ? AnyShapeStyle(.white) : AnyShapeStyle(.primary))
+        .padding(.horizontal, 8)
+        .frame(height: 44)
         .background(
-            RoundedRectangle(cornerRadius: 8, style: .continuous)
-                .fill(isSelected ? Color.accentColor.opacity(0.18) : isHovered ? Color.primary.opacity(0.05) : .clear)
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .fill(isSelected ? accent : isHovered ? Color.primary.opacity(0.05) : .clear)
         )
         .contentShape(Rectangle())
         .onHover { isHovered = $0 }

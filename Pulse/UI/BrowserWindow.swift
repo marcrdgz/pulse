@@ -163,6 +163,7 @@ struct BrowserWindow: View {
             )
             .id(mode)
             .padding(.top, 120)
+            .transition(.scale(scale: 0.97, anchor: .top).combined(with: .opacity))
         }
         .transition(.opacity)
     }
