@@ -3,7 +3,18 @@ import Base from '../layouts/Base.astro';
 import Keys from '../components/Keys.astro';
 import Mark from '../components/Mark.astro';
 // The same notes Pulse shows in What's New; the `/release` skill writes them, newest first.
-import releases from '../../../Pulse/Resources/ReleaseNotes.json';
+import releaseNotes from '../../../Pulse/Resources/ReleaseNotes.json';
+
+// Mirrors `ReleaseNotes.swift`. Typed explicitly so the page still builds while the file is empty.
+interface Release {
+  version: string;
+  date: string;
+  summary: string;
+  highlights: { title: string; body: string; symbol: string; shortcut?: string; scene?: string }[];
+  improvements: string[];
+  fixes: string[];
+}
+const releases: Release[] = releaseNotes;
 
 // Dates are calendar days, so format them in UTC to keep them from shifting a day.
 const formatDate = (day: string) =>
@@ -47,7 +58,7 @@ const withoutPeriod = (text: string) => text.replace(/\.$/, '');
                   <li>
                     <div class="highlight-head">
                       <h3>{highlight.title}</h3>
-                      {'shortcut' in highlight && highlight.shortcut && <Keys combos={[highlight.shortcut]} />}
+                      {highlight.shortcut &&<Keys combos={[highlight.shortcut]} />}
                     </div>
                     <p>{highlight.body}</p>
                   </li>
