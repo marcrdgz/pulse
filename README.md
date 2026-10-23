@@ -1,62 +1,69 @@
 # Pulse
 
-🧘 Fast, open-source and privacy-focused browser built on top of Electron.
+A native macOS browser built on WebKit, with Arc's look and keyboard-first workflow.
 
-## About
+## Features
 
-Pulse is a browser built on top of Electron, Svelte and Vite. The main goal of this project is to understand how these technologies work together and learn about them.
+- Spaces: separate sidebars with their own color, pinned and "Today" tabs; Favorites (favicon grid) are shared.
+- Switch spaces with ⌃1…⌃9, ⌘⌥← / ⌘⌥→, the dots at the bottom of the sidebar, or a two-finger swipe.
+- Command bar (⌘T / ⌘L) that behaves like Chrome's address bar: inline completion of sites you
+  type or visit often, history ranked by frequency and recency, open tabs and Google suggestions.
+  ⇥ or → accepts the completion, ⇧⌦ removes a suggestion from history.
+- Inset rounded web content, collapsible sidebar that peeks in from the left edge.
+- Drag tabs to reorder them, or between Favorites, Pinned and Today; resize the sidebar by its edge.
+- Double-click a tab to rename it; middle-click to close it.
+- Context menus like Chrome's: page links, images and video open in background tabs or another
+  space, "Copy Image Address", searches with your engine, and Copy URL, Share and Print on the page.
+  Tabs can be duplicated, closed below or closed with all others; pinned tabs can keep the current page.
+  Downloads and history rows have their own menus.
+- Session restore; tabs load lazily when first shown.
+- Find in page and a native error page when a site can't load.
+- Links to other apps (`mailto:`, `zoommtg:`…) open in that app, asking first unless clicked; sign-in
+  prompts for HTTP Basic/Digest auth and JavaScript `prompt()` dialogs.
+- Closing a popup or a link opened in a new tab returns to the page that opened it.
+- Hovering a link previews its URL in the page's corner; tabs show a spinner while loading and a
+  red camera or microphone while a site uses them.
+- VoiceOver labels for sidebar controls, and fades instead of slides with Reduce Motion on.
+- Downloads like Chrome's: a bubble with progress, pause/resume, cancel and retry, and a ⌘⇧J page
+  that remembers past downloads.
+- First-launch onboarding that imports Chrome's history and bookmarks bar (also File › Import from
+  Chrome…) and offers to make Pulse the default browser.
+- Settings (⌘,): startup behavior, default browser, search engine and suggestions, download
+  location prompt, per-site camera/microphone permissions.
+- History like Chrome's: ⌘Y page grouped by day with search and multi-select delete, a History menu
+  with recently closed tabs and visits, and "Clear Browsing Data" (⌘⇧⌫).
 
-### Why?
+## Shortcuts
 
-Mainly because I am always trying new apps (i.e. Ghostty). In terms of browsers, there is not much to choose from, from modern browsers we have Arc (_WHY I NEED TO LOG IN_), Vivaldi (_prioritizes webpage hot keys over browser hot keys_ 😔) and Zen (_really cool, but firefox_ 🥶).
-
-So, why not doing my own browser? 🤔 Well, I am not going to fork Chromium or Firefox, that is a lot of work and low-level programming. I was curious about Electron, web technologies and used by a lot of cool apps like Discord, Notion, Obsidian, Dropbox,[etc.](https://www.electronjs.org/apps). I found that it uses Chromium inside, so I only need to focus on the browser itself.
-
-## Tech stack
-
-- [Electron](https://www.electronjs.org/)
-- [Svelte](https://svelte.dev/)
-- [Vite](https://vitejs.dev/)
-- [Bun](https://bun.sh/)
-- TODO: [Crowdin](https://crowdin.com/)
-
-#### Why Svelte?
-
-Well, pretty known, well maintained and it is really fast, so why not? I am using it for the interface of the browser, so speed is a must. It does not uses a virtual DOM, I can ensure it is fast.
-
-#### Why Vite?
-
-Is fast and really powerful, also there is this package [electron-vite](https://electron-vite.org/) that helps to integrate Vite with Electron, and support TypeScript.
+| Shortcut | Action |
+| --- | --- |
+| ⌘T | New tab (command bar) |
+| ⌘L | Edit current URL |
+| ⌘W / ⌘⇧T | Close tab (resets pinned tabs) / reopen closed tab |
+| ⌘D | Pin / unpin tab in the current space |
+| ⌃1…⌃9 | Switch to space N |
+| ⌘⌥← / ⌘⌥→ | Previous / next space |
+| ⌘S | Toggle sidebar |
+| ⌘1…⌘8, ⌘9 | Select tab N / last tab |
+| ⌘⌥↓ ⌘⌥↑, ⌃⇥ ⌃⇧⇥ | Next / previous tab |
+| ⌘[ / ⌘] | Back / forward |
+| ⌘R / ⌘⇧R | Reload / reload ignoring cache |
+| ⌘⇧C | Copy URL |
+| ⌘F / ⌘G / ⌘⇧G | Find on page / next / previous match |
+| ⌘+ / ⌘- / ⌘0 | Zoom |
+| ⌘⌥I | Web Inspector |
+| ⌘Y / ⌘⇧⌫ | History / Clear browsing data |
+| ⌘⇧J | Downloads |
+| ⌘-click / middle-click | Open link in background tab (add ⇧ for a foreground tab) |
 
 ## Development
 
-So... You want to help? See TODO.md for current bugs,refactors and feats, but feel free to do what you want.
+Requires Xcode 26 and [XcodeGen](https://github.com/yonaskolb/XcodeGen) (`brew install xcodegen`).
+The Xcode project is generated from `project.yml` and not committed.
 
-### Install
-
-```bash
-$ nvm use
-```
-
-```bash
-$ bun install
-```
-
-### Development
-
-```bash
-$ bun run dev
-```
-
-### Build
-
-```bash
-# For windows
-$ bun run build:win
-
-# For macOS
-$ bun run build:mac
-
-# For Linux
-$ bun run build:linux
+```sh
+xcodegen generate
+open Pulse.xcodeproj
+# or
+xcodebuild -project Pulse.xcodeproj -scheme Pulse -destination 'platform=macOS' test
 ```

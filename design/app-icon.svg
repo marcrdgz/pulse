@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <defs>
+    <linearGradient id="tile" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="64" y2="64">
+      <stop offset="0" stop-color="#14112A"/>
+      <stop offset="1" stop-color="#05040C"/>
+    </linearGradient>
+    <linearGradient id="ring" gradientUnits="userSpaceOnUse" x1="46" y1="14" x2="18" y2="50">
+      <stop offset="0" stop-color="#FFE7B0"/>
+      <stop offset=".33" stop-color="#FF8A4C"/>
+      <stop offset=".67" stop-color="#E0307A"/>
+      <stop offset="1" stop-color="#7B4DFF"/>
+    </linearGradient>
+  </defs>
+  <rect width="64" height="64" rx="14.3" fill="url(#tile)"/>
+  <rect x=".5" y=".5" width="63" height="63" rx="13.8" fill="none" stroke="#262040"/>
+  <circle cx="32" cy="32" r="17" fill="none" stroke="url(#ring)" stroke-width="3.5"/>
+  <circle cx="44.02" cy="19.98" r="8" fill="#FFE7B0" opacity=".22"/>
+  <circle cx="44.02" cy="19.98" r="4.5" fill="#FFFFFF"/>
+</svg>
