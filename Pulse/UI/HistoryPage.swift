@@ -8,6 +8,9 @@ struct HistoryPage: View {
     let tab: Tab
     @State private var query = ""
     @State private var visits: [HistoryVisit] = []
+    @State private var days: [Day] = []
+    /// Grows a page at a time as the list scrolls to its end, so opening the page stays cheap.
+    @State private var limit = Self.pageSize
     @State private var selection: Set<HistoryVisit.ID> = []
     @FocusState private var isSearchFocused: Bool
 
@@ -28,7 +31,10 @@ struct HistoryPage: View {
             reload()
             isSearchFocused = true
         }
-        .onChange(of: query) { reload() }
+        .onChange(of: query) {
+            limit = Self.pageSize
+            reload()
+        }
         .onChange(of: browser.history?.revision) { reload() }
     }
 
@@ -70,31 +76,38 @@ struct HistoryPage: View {
         }
     }
 
+    /// Days and their rows share one lazy stack so only the rows on screen get built; a day can
+    /// hold hundreds of visits.
     private var list: some View {
         ScrollView {
-            LazyVStack(alignment: .leading, spacing: 20) {
+            LazyVStack(alignment: .leading, spacing: 0) {
                 ForEach(days, id: \.start) { day in
-                    VStack(alignment: .leading, spacing: 6) {
+                    Section {
+                        ForEach(day.visits) { visit in
+                            HistoryRow(
+                                visit: visit,
+                                isSelected: selection.contains(visit.id),
+                                isSelecting: !selection.isEmpty,
+                                toggleSelection: { toggle(visit) },
+                                open: { inBackground in open(visit, inBackground: inBackground) },
+                                copyLink: { browser.copyLink(visit.url) },
+                                showMoreFromSite: { query = visit.url.displayHost ?? "" },
+                                remove: { browser.history?.deleteVisits([visit.id]) }
+                            )
+                            .padding(.top, visit.id == day.visits.first?.id ? 4 : 0)
+                            .padding(.bottom, visit.id == day.visits.last?.id ? 4 : 0)
+                            .background(.quaternary.opacity(0.35), in: dayBackgroundShape(for: visit, in: day))
+                            .onAppear {
+                                if visit.id == visits.last?.id { loadMore() }
+                            }
+                        }
+                    } header: {
                         Text(day.title)
                             .font(.system(size: 13, weight: .semibold))
                             .foregroundStyle(.secondary)
                             .padding(.leading, 12)
-                        VStack(spacing: 0) {
-                            ForEach(day.visits) { visit in
-                                HistoryRow(
-                                    visit: visit,
-                                    isSelected: selection.contains(visit.id),
-                                    isSelecting: !selection.isEmpty,
-                                    toggleSelection: { toggle(visit) },
-                                    open: { inBackground in open(visit, inBackground: inBackground) },
-                                    copyLink: { browser.copyLink(visit.url) },
-                                    showMoreFromSite: { query = visit.url.displayHost ?? "" },
-                                    remove: { browser.history?.deleteVisits([visit.id]) }
-                                )
-                            }
-                        }
-                        .padding(.vertical, 4)
-                        .background(.quaternary.opacity(0.35), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+                            .padding(.top, day.start == days.first?.start ? 0 : 20)
+                            .padding(.bottom, 6)
                     }
                 }
             }
@@ -120,6 +133,19 @@ struct HistoryPage: View {
         return query.isEmpty ? "Pages you visit will appear here" : "No results for “\(query)”"
     }
 
+    /// Rounds the outer corners of a day's first and last rows, so the day reads as one card.
+    private func dayBackgroundShape(for visit: HistoryVisit, in day: Day) -> UnevenRoundedRectangle {
+        let top: CGFloat = visit.id == day.visits.first?.id ? 10 : 0
+        let bottom: CGFloat = visit.id == day.visits.last?.id ? 10 : 0
+        return UnevenRoundedRectangle(
+            topLeadingRadius: top,
+            bottomLeadingRadius: bottom,
+            bottomTrailingRadius: bottom,
+            topTrailingRadius: top,
+            style: .continuous
+        )
+    }
+
     private struct Day {
         let start: Date
         let visits: [HistoryVisit]
@@ -132,23 +158,39 @@ struct HistoryPage: View {
         }
     }
 
+    private static let pageSize = 200
+
     /// Visits arrive newest first, so days come out in order too.
-    private var days: [Day] {
+    private static func groupByDay(_ visits: [HistoryVisit]) -> [Day] {
         var days: [Day] = []
+        var start: Date?
+        var dayVisits: [HistoryVisit] = []
         for visit in visits {
-            let start = Calendar.current.startOfDay(for: visit.date)
-            if days.last?.start == start {
-                days[days.count - 1] = Day(start: start, visits: days[days.count - 1].visits + [visit])
-            } else {
-                days.append(Day(start: start, visits: [visit]))
+            let visitDay = Calendar.current.startOfDay(for: visit.date)
+            if let start, visitDay != start {
+                days.append(Day(start: start, visits: dayVisits))
+                dayVisits = []
             }
+            start = visitDay
+            dayVisits.append(visit)
+        }
+        if let start {
+            days.append(Day(start: start, visits: dayVisits))
         }
         return days
     }
 
     private func reload() {
-        visits = browser.history?.visits(matching: query) ?? []
+        visits = browser.history?.visits(matching: query, limit: limit) ?? []
+        days = Self.groupByDay(visits)
         selection.formIntersection(visits.map(\.id))
+    }
+
+    /// A full page means there may be older visits to fetch.
+    private func loadMore() {
+        guard visits.count == limit else { return }
+        limit += Self.pageSize
+        reload()
     }
 
     private func toggle(_ visit: HistoryVisit) {
