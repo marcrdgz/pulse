@@ -4,6 +4,7 @@ import SwiftUI
 /// The ⌘T / ⌘L address bar, with Chrome's omnibox behavior in an Arc-style floating panel.
 struct CommandBarView: View {
     @Environment(Browser.self) private var browser
+    @Environment(\.openSettings) private var openSettings
     let mode: CommandBarMode
     @State private var text: String
     /// ⌘L opens with the current address selected; suggestions wait until it's edited.
@@ -25,6 +26,7 @@ struct CommandBarView: View {
             history: browser.history?.entries(matching: text) ?? [],
             openTabs: browser.everyTab,
             searchSuggestions: searchSuggestions,
+            actions: browser.commandBarActions,
             allowsInlineCompletion: allowsInlineCompletion,
             searchEngine: browser.preferences.searchEngine
         )
@@ -127,6 +129,10 @@ struct CommandBarView: View {
         case .navigate(let url, _): browser.open(url, from: mode, isTyped: true)
         case .search(_, let url): browser.open(url, from: mode)
         case .switchTo(let tab): browser.switchTo(tab)
+        case .action(let action) where action.kind == .openSettings:
+            browser.dismissCommandBar()
+            openSettings()
+        case .action(let action): browser.perform(action.kind)
         }
     }
 
@@ -181,7 +187,7 @@ private struct SuggestionRow: View {
                 }
                 .buttonStyle(SidebarIconButtonStyle())
                 .help("Remove from History (⇧⌦)")
-            } else if let hint, isSelected || isTabSwitch {
+            } else if let hint, isSelected || showsHintAlways {
                 HStack(spacing: 6) {
                     Text(hint)
                     if isSelected {
@@ -207,9 +213,12 @@ private struct SuggestionRow: View {
         .onHover { isHovered = $0 }
     }
 
-    private var isTabSwitch: Bool {
-        if case .switchTo = suggestion { return true }
-        return false
+    /// Tab switches and actions differ from opening a page, so they always say what they'll do.
+    private var showsHintAlways: Bool {
+        switch suggestion {
+        case .switchTo, .action: true
+        case .navigate, .search: false
+        }
     }
 
     @ViewBuilder private var icon: some View {
@@ -222,6 +231,7 @@ private struct SuggestionRow: View {
             }
         case .search: Image(systemName: "magnifyingglass")
         case .switchTo(let tab): FaviconView(tab: tab, size: 16)
+        case .action(let action): Image(systemName: action.symbol)
         }
     }
 
@@ -230,6 +240,7 @@ private struct SuggestionRow: View {
         case .navigate(let url, let title): title.flatMap { $0.isEmpty ? nil : $0 } ?? url.omniboxText
         case .search(let query, _): query
         case .switchTo(let tab): tab.displayTitle
+        case .action(let action): action.title
         }
     }
 
@@ -238,6 +249,7 @@ private struct SuggestionRow: View {
         case .navigate(let url, let title): title.flatMap { $0.isEmpty ? nil : url.omniboxText }
         case .search: browser.preferences.searchEngine.searchLabel
         case .switchTo(let tab): tab.url.displayHost
+        case .action: nil
         }
     }
 
@@ -246,6 +258,7 @@ private struct SuggestionRow: View {
         case .navigate: "Open"
         case .search: "Search"
         case .switchTo: "Switch to Tab"
+        case .action(let action): action.shortcut ?? "Run"
         }
     }
 }

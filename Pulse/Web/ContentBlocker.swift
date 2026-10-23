@@ -29,7 +29,11 @@ final class ContentBlocker {
     }
 
     /// Without a store nothing is downloaded or compiled, so tests stay offline.
-    init(store: WKContentRuleListStore? = nil, defaults: UserDefaults? = nil, preferences: Preferences = Preferences()) {
+    init(
+        store: WKContentRuleListStore? = nil,
+        defaults: UserDefaults? = nil,
+        preferences: Preferences = Preferences()
+    ) {
         self.store = store
         self.defaults = defaults
         self.preferences = preferences

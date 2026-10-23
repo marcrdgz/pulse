@@ -8,7 +8,8 @@ A native macOS browser built on WebKit, with Arc's look and keyboard-first workf
 - Switch spaces with ⌃1…⌃9, ⌘⌥← / ⌘⌥→, the dots at the bottom of the sidebar, or a two-finger swipe.
 - Command bar (⌘T / ⌘L) that behaves like Chrome's address bar: inline completion of sites you
   type or visit often, history ranked by frequency and recency, open tabs and Google suggestions.
-  ⇥ or → accepts the completion, ⇧⌦ removes a suggestion from history.
+  ⇥ or → accepts the completion, ⇧⌦ removes a suggestion from history. It also runs actions, like
+  Arc's: type "pin", "move tab to work", "devtools" or "clear data" and pick it right below the top result.
 - Inset rounded web content, collapsible sidebar that peeks in from the left edge.
 - Drag tabs to reorder them, or between Favorites, Pinned and Today; resize the sidebar by its edge.
 - Double-click a tab to rename it; middle-click to close it.

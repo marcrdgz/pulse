@@ -5,12 +5,14 @@ enum OmniboxSuggestion: Identifiable {
     case navigate(URL, title: String?)
     case search(query: String, url: URL)
     case switchTo(Tab)
+    case action(CommandBarAction)
 
     var id: String {
         switch self {
         case .navigate(let url, _): "url:\(url.absoluteString)"
         case .search(let query, _): "search:\(query)"
         case .switchTo(let tab): "tab:\(tab.id)"
+        case .action(let action): "action:\(action.kind)"
         }
     }
 
@@ -20,6 +22,7 @@ enum OmniboxSuggestion: Identifiable {
         case .navigate(let url, _): url.absoluteString
         case .search(let query, _): query
         case .switchTo(let tab): tab.url.absoluteString
+        case .action(let action): action.title
         }
     }
 }
@@ -31,15 +34,18 @@ struct OmniboxResult {
 }
 
 /// Chrome's address bar behavior: inline-complete addresses you go to often, then list what you
-/// typed, history ranked by frequency and recency, open tabs and search suggestions.
+/// typed, history ranked by frequency and recency, open tabs and search suggestions. Matching
+/// actions come right after the top suggestion, so Return still opens what was typed.
 enum Omnibox {
     static let maxSuggestions = 8
+    static let maxActions = 3
 
     static func result(
         for input: String,
         history: [HistoryEntry],
         openTabs: [Tab],
         searchSuggestions: [String],
+        actions: [CommandBarAction] = [],
         allowsInlineCompletion: Bool,
         searchEngine: SearchEngine = .google,
         now: Date = .now
@@ -83,6 +89,8 @@ enum Omnibox {
         suggestions += searchSuggestions
             .filter { $0.lowercased() != needle }
             .compactMap { query in searchEngine.searchURL(for: query).map { .search(query: query, url: $0) } }
+        let matchingActions = actions.filter { $0.matches(text) }.prefix(maxActions).map(OmniboxSuggestion.action)
+        suggestions.insert(contentsOf: matchingActions, at: min(1, suggestions.count))
 
         return OmniboxResult(suggestions: deduplicated(suggestions), inlineCompletion: inlineCompletion)
     }
@@ -129,7 +137,7 @@ enum Omnibox {
             let url: String? = switch suggestion {
             case .navigate(let url, _): url.omniboxText
             case .switchTo(let tab): tab.url.omniboxText
-            case .search: nil
+            case .search, .action: nil
             }
             guard seenIDs.insert(suggestion.id).inserted else { continue }
             if let url, !seenURLs.insert(url).inserted { continue }
