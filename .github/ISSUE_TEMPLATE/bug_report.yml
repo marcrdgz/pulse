@@ -1,0 +1,61 @@
+name: Bug report
+description: Something in Pulse doesn't work as it should.
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting! **Help › Report a Problem…** in Pulse saves a diagnostics file and opens this form with your versions filled in; drag the file into "Diagnostics" below. It holds versions, tab counts and Pulse's log, never your URLs or page titles.
+  - type: textarea
+    id: description
+    attributes:
+      label: What happened?
+      description: What went wrong, and what you expected instead.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Open a tab on …
+        2. Press ⌘…
+        3. …
+    validations:
+      required: true
+  - type: dropdown
+    id: frequency
+    attributes:
+      label: How often does it happen?
+      options:
+        - Every time
+        - Sometimes
+        - Once
+    validations:
+      required: true
+  - type: input
+    id: url
+    attributes:
+      label: Page where it happens
+      description: Only if the bug is specific to a site, and only if it's fine to share publicly.
+      placeholder: https://example.com
+  - type: input
+    id: version
+    attributes:
+      label: Pulse version
+      description: Pulse › About Pulse.
+      placeholder: 0.2.0 (1)
+    validations:
+      required: true
+  - type: input
+    id: macos
+    attributes:
+      label: macOS version
+      placeholder: Version 26.0 (Build 25A354)
+    validations:
+      required: true
+  - type: textarea
+    id: diagnostics
+    attributes:
+      label: Diagnostics
+      description: Drag the file from Help › Report a Problem… here, plus any screenshots or recordings.

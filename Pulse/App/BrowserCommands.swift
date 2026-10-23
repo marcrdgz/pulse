@@ -63,6 +63,11 @@ struct BrowserCommands: Commands {
                     Button("Install Extension…", action: extensions.chooseAndInstall)
                 }
             }
+
+            // Pulse has no help book: the system item would only say help isn't available.
+            CommandGroup(replacing: .help) {
+                Button("Report a Problem…") { ProblemReport.file(from: mainBrowser) }
+            }
         }
 
         CommandGroup(after: .textEditing) {

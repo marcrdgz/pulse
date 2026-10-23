@@ -49,6 +49,8 @@ A native macOS browser built on WebKit, with Arc's look and keyboard-first workf
   them in Settings › Extensions. Private windows run no extensions.
 - History like Chrome's: ⌘Y page grouped by day with search and multi-select delete, a History menu
   with recently closed tabs and visits, and "Clear Browsing Data" (⌘⇧⌫).
+- Help › Report a Problem… saves a diagnostics file (versions, tab counts and Pulse's log, no URLs
+  or titles) and opens a prefilled GitHub bug report to attach it to.
 
 ## Shortcuts
 
