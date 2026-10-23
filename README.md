@@ -14,6 +14,9 @@ A native macOS browser built on WebKit, with Arc's look and keyboard-first workf
 - Double-click a tab to rename it; middle-click to close it.
 - Session restore; tabs load lazily when first shown.
 - Find in page and a native error page when a site can't load.
+- Links to other apps (`mailto:`, `zoommtg:`…) open in that app, asking first unless clicked; sign-in
+  prompts for HTTP Basic/Digest auth and JavaScript `prompt()` dialogs.
+- Closing a popup or a link opened in a new tab returns to the page that opened it.
 - Hovering a link previews its URL in the page's corner; tabs show a spinner while loading and a
   red camera or microphone while a site uses them.
 - VoiceOver labels for sidebar controls, and fades instead of slides with Reduce Motion on.
@@ -45,7 +48,7 @@ A native macOS browser built on WebKit, with Arc's look and keyboard-first workf
 | ⌘⌥I | Web Inspector |
 | ⌘Y / ⌘⇧⌫ | History / Clear browsing data |
 | ⌘⇧J | Downloads |
-| ⌘-click | Open link in background tab |
+| ⌘-click / middle-click | Open link in background tab (add ⇧ for a foreground tab) |
 
 ## Development
 

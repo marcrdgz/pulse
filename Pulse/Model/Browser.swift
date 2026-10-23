@@ -136,8 +136,9 @@ final class Browser {
     }
 
     /// Creates the tab WebKit needs for `window.open` / `target=_blank` and returns its web view.
-    func openPopup(configuration: WKWebViewConfiguration) -> WKWebView {
+    func openPopup(from opener: Tab, configuration: WKWebViewConfiguration) -> WKWebView {
         let tab = openTab(url: URL(string: "about:blank")!)
+        tab.opener = opener
         return tab.adoptWebView(configuration: configuration)
     }
 
@@ -178,11 +179,15 @@ final class Browser {
                   let index = space.todayTabs.firstIndex(where: { $0.id == tab.id }) {
             space.todayTabs.remove(at: index)
             tab.unload()
-            closedTabs.append(ClosedTab(url: tab.url, title: tab.title, spaceID: space.id, index: index))
+            if tab.url.absoluteString != "about:blank" {
+                closedTabs.append(ClosedTab(url: tab.url, title: tab.title, spaceID: space.id, index: index))
+            }
             if space.activeTabID == tab.id {
                 if space.id == activeSpaceID { isFindBarVisible = false }
+                // Like Chrome, closing a popup or a link opened in a new tab returns to the page that opened it.
+                let opener = tab.opener.flatMap { opener in (favorites + space.tabs).first { $0 === opener } }
                 let neighbor = space.todayTabs.indices.contains(index) ? space.todayTabs[index] : space.todayTabs.last
-                space.activeTabID = neighbor?.id
+                space.activeTabID = (opener ?? neighbor)?.id
             }
         }
 

@@ -1,5 +1,6 @@
 import Foundation
 import Testing
+import WebKit
 @testable import Pulse
 
 struct BrowserTests {
@@ -42,6 +43,17 @@ struct BrowserTests {
 
         browser.closeActiveTab()
         #expect(hosts([browser.activeTab!]) == ["c"])
+    }
+
+    @Test func closingPopupReturnsToItsOpenerAndIsNotReopenable() {
+        let browser = makeBrowser("a", "b", "c")
+        let opener = browser.todayTabs[2]
+        browser.select(opener)
+        _ = browser.openPopup(from: opener, configuration: WKWebViewConfiguration())
+
+        browser.closeActiveTab()
+        #expect(browser.activeTab === opener)
+        #expect(!browser.canReopenClosedTab)
     }
 
     @Test func closingLastTabOpensCommandBar() {

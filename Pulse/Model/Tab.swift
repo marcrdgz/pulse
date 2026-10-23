@@ -23,6 +23,8 @@ final class Tab: Identifiable {
     var customTitle: String?
 
     @ObservationIgnored weak var browser: Browser?
+    /// The tab whose page opened this one with `window.open` or `target=_blank`.
+    @ObservationIgnored weak var opener: Tab?
     @ObservationIgnored private var loadedWebView: WKWebView?
     @ObservationIgnored private var coordinator: WebViewCoordinator?
     @ObservationIgnored private var observations: [NSKeyValueObservation] = []
@@ -120,6 +122,11 @@ final class Tab: Identifiable {
     /// WebKit leaves `url` pointing at the file after a navigation becomes a download;
     /// the page actually shown is the current history item.
     func navigationDidBecomeDownload() {
+        // A popup opened just for the download (a `target=_blank` link to a file) has nothing to show.
+        if opener != nil, loadedWebView?.backForwardList.currentItem == nil {
+            browser?.close(self)
+            return
+        }
         guard let currentURL = loadedWebView?.backForwardList.currentItem?.url, currentURL != url else { return }
         url = currentURL
         browser?.tabDidUpdate()

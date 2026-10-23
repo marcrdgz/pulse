@@ -16,5 +16,4 @@
 
 ## Bugs
 
-- [ ] A `target=_blank` link that turns into a download leaves an empty tab behind.
 - [ ] Unreproduced: during manual testing the session once lost two Today tabs.

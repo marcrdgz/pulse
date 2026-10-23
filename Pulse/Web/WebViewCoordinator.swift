@@ -24,15 +24,29 @@ final class WebViewCoordinator: NSObject, WKNavigationDelegate, WKUIDelegate {
             decisionHandler(.download)
             return
         }
-        // ⌘-click opens the link in a background tab, like Arc and Safari.
-        if navigationAction.navigationType == .linkActivated,
-           navigationAction.modifierFlags.contains(.command),
-           let url = navigationAction.request.url {
-            tab?.browser?.openTab(url: url, activate: false)
+        if let url = navigationAction.request.url, url.opensInOtherApp {
+            decisionHandler(.cancel)
+            // A clicked link is consent enough; redirects and scripts must ask, like Safari.
+            openInOtherApp(url, askFirst: navigationAction.navigationType != .linkActivated, from: webView.url)
+            return
+        }
+        if case .newTab(let activate) = LinkTarget(navigationAction), let url = navigationAction.request.url {
+            tab?.browser?.openTab(url: url, activate: activate).opener = tab
             decisionHandler(.cancel)
             return
         }
         decisionHandler(.allow)
+    }
+
+    func webView(
+        _ webView: WKWebView,
+        respondTo challenge: URLAuthenticationChallenge
+    ) async -> (URLSession.AuthChallengeDisposition, URLCredential?) {
+        let passwordMethods = [NSURLAuthenticationMethodHTTPBasic, NSURLAuthenticationMethodHTTPDigest]
+        guard passwordMethods.contains(challenge.protectionSpace.authenticationMethod),
+              let credential = askForCredential(challenge)
+        else { return (.performDefaultHandling, nil) }
+        return (.useCredential, credential)
     }
 
     func webView(
@@ -93,7 +107,12 @@ final class WebViewCoordinator: NSObject, WKNavigationDelegate, WKUIDelegate {
         for navigationAction: WKNavigationAction,
         windowFeatures: WKWindowFeatures
     ) -> WKWebView? {
-        tab?.browser?.openPopup(configuration: configuration)
+        guard let tab, let browser = tab.browser else { return nil }
+        if case .newTab(let activate) = LinkTarget(navigationAction), let url = navigationAction.request.url {
+            browser.openTab(url: url, activate: activate).opener = tab
+            return nil
+        }
+        return browser.openPopup(from: tab, configuration: configuration)
     }
 
     func webView(
@@ -140,6 +159,22 @@ final class WebViewCoordinator: NSObject, WKNavigationDelegate, WKUIDelegate {
 
     func webView(
         _ webView: WKWebView,
+        runJavaScriptTextInputPanelWithPrompt prompt: String,
+        defaultText: String?,
+        initiatedByFrame frame: WKFrameInfo
+    ) async -> String? {
+        let alert = makeAlert(message: prompt, frame: frame)
+        let field = NSTextField(string: defaultText ?? "")
+        field.frame.size.width = 260
+        alert.accessoryView = field
+        alert.addButton(withTitle: "OK")
+        alert.addButton(withTitle: "Cancel")
+        alert.window.initialFirstResponder = field
+        return alert.runModal() == .alertFirstButtonReturn ? field.stringValue : nil
+    }
+
+    func webView(
+        _ webView: WKWebView,
         runOpenPanelWith parameters: WKOpenPanelParameters,
         initiatedByFrame frame: WKFrameInfo
     ) async -> [URL]? {
@@ -149,10 +184,60 @@ final class WebViewCoordinator: NSObject, WKNavigationDelegate, WKUIDelegate {
         return panel.runModal() == .OK ? panel.urls : nil
     }
 
+    private func openInOtherApp(_ url: URL, askFirst: Bool, from pageURL: URL?) {
+        guard let app = NSWorkspace.shared.urlForApplication(toOpen: url) else {
+            NSSound.beep()
+            return
+        }
+        if askFirst {
+            let alert = NSAlert()
+            alert.messageText = "Open “\(FileManager.default.displayName(atPath: app.path))”?"
+            alert.informativeText = "\(pageURL?.displayHost ?? "This page") wants to open this application."
+            alert.addButton(withTitle: "Open")
+            alert.addButton(withTitle: "Cancel")
+            guard alert.runModal() == .alertFirstButtonReturn else { return }
+        }
+        NSWorkspace.shared.open(url)
+    }
+
+    /// Basic and Digest auth sign-in, like Safari's sheet; `nil` when cancelled.
+    private func askForCredential(_ challenge: URLAuthenticationChallenge) -> URLCredential? {
+        let space = challenge.protectionSpace
+        let alert = NSAlert()
+        alert.messageText = "Log in to \(space.host)"
+        alert.informativeText = space.receivesCredentialSecurely
+            ? "Your login information will be sent securely."
+            : "Your login information will be sent unencrypted."
+        let user = NSTextField(string: challenge.proposedCredential?.user ?? "")
+        user.placeholderString = "Username"
+        let password = NSSecureTextField(string: "")
+        password.placeholderString = "Password"
+        let fields = NSStackView(views: [user, password])
+        fields.orientation = .vertical
+        fields.frame.size = NSSize(width: 260, height: 52)
+        user.nextKeyView = password
+        alert.accessoryView = fields
+        alert.addButton(withTitle: "Log In")
+        alert.addButton(withTitle: "Cancel")
+        alert.window.initialFirstResponder = user.stringValue.isEmpty ? user : password
+        guard alert.runModal() == .alertFirstButtonReturn else { return nil }
+        return URLCredential(user: user.stringValue, password: password.stringValue, persistence: .forSession)
+    }
+
     private func makeAlert(message: String, frame: WKFrameInfo) -> NSAlert {
         let alert = NSAlert()
         alert.messageText = frame.request.url?.displayHost ?? "This page says"
         alert.informativeText = message
         return alert
+    }
+}
+
+private extension LinkTarget {
+    init(_ action: WKNavigationAction) {
+        self.init(
+            isLinkClick: action.navigationType == .linkActivated,
+            buttonMask: action.buttonNumber,
+            modifierFlags: action.modifierFlags
+        )
     }
 }
