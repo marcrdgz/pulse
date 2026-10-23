@@ -355,6 +355,8 @@ final class Tab: NSObject, Identifiable {
         // Without a Safari token some sites (e.g. Google) serve degraded markup to WKWebView.
         configuration.applicationNameForUserAgent = "Version/26.0 Safari/605.1.15"
         configuration.preferences.isElementFullscreenEnabled = true
+        // `isInspectable` only allows Safari's remote inspector; the in-app one also needs developer extras.
+        configuration.preferences.setValue(true, forKey: "developerExtrasEnabled")
         LinkHover.install(in: configuration.userContentController)
         ScreenShareQuality.install(in: configuration.userContentController)
         if extensions != nil { ChromeWebStorePage.install(in: configuration.userContentController) }
