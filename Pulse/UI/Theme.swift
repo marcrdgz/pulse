@@ -4,6 +4,7 @@ import SwiftUI
 enum Theme {
     static let defaultSidebarWidth: Double = 240
     static let sidebarWidthRange: ClosedRange<Double> = 200...420
+    static let collapsedSidebarWidth: CGFloat = 52
     static let contentInset: CGFloat = 8
     static let contentCornerRadius: CGFloat = 10
     static let rowCornerRadius: CGFloat = 8

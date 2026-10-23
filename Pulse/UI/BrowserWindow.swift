@@ -19,18 +19,22 @@ struct BrowserWindow: View {
             WindowDragArea()
 
             HStack(spacing: 0) {
-                if browser.isSidebarVisible {
+                if browser.isSidebarExpanded {
                     SidebarView()
                         .frame(width: sidebarWidth)
                         .overlay(alignment: .trailing) {
                             SidebarResizeHandle(width: $sidebarWidth)
                         }
                         .transition(reduceMotion ? .opacity : .move(edge: .leading))
+                } else {
+                    CollapsedSidebar()
+                        .onHover(perform: schedulePeek)
+                        .transition(.opacity)
                 }
                 content
             }
 
-            if !browser.isSidebarVisible {
+            if isPeekingSidebar {
                 sidebarPeek
             }
 
@@ -45,13 +49,16 @@ struct BrowserWindow: View {
         }
         .ignoresSafeArea()
         .frame(minWidth: 720, minHeight: 460)
-        .background(WindowChrome(showsTrafficLights: browser.isSidebarVisible || isPeekingSidebar))
-        .animation(.snappy(duration: 0.25), value: browser.isSidebarVisible)
+        .background(WindowChrome(showsTrafficLights: browser.isSidebarExpanded || isPeekingSidebar))
+        .animation(.snappy(duration: 0.25), value: browser.isSidebarExpanded)
         .animation(.snappy(duration: 0.2), value: isPeekingSidebar)
+        .onChange(of: browser.isSidebarExpanded) {
+            peekTask?.cancel()
+            isPeekingSidebar = false
+        }
         .animation(.easeOut(duration: 0.15), value: browser.commandBar)
         .animation(.snappy, value: browser.toast)
         .animation(.snappy(duration: 0.2), value: browser.isFindBarVisible)
-        .onChange(of: browser.isSidebarVisible) { isPeekingSidebar = false }
         .onAppear(perform: installControlShortcutMonitor)
         .sheet(isPresented: Bindable(browser).isClearBrowsingDataPresented) {
             ClearBrowsingDataView()
@@ -75,7 +82,6 @@ struct BrowserWindow: View {
         )
         .padding(.vertical, Theme.contentInset)
         .padding(.trailing, Theme.contentInset)
-        .padding(.leading, browser.isSidebarVisible ? 0 : Theme.contentInset)
     }
 
     @ViewBuilder private var page: some View {
@@ -118,30 +124,25 @@ struct BrowserWindow: View {
         }
     }
 
-    /// With the sidebar hidden, hovering the window's left edge slides it in over the page, like Arc.
-    @ViewBuilder private var sidebarPeek: some View {
-        Color.clear
-            .frame(width: Theme.contentInset)
-            .contentShape(Rectangle())
-            .onHover { isHovering in
-                peekTask?.cancel()
-                guard isHovering else { return }
-                // A short delay so sweeping the pointer past the edge doesn't pop the sidebar open.
-                peekTask = Task {
-                    try? await Task.sleep(for: .milliseconds(150))
-                    if !Task.isCancelled { isPeekingSidebar = true }
-                }
-            }
+    /// Hovering the collapsed rail slides the full sidebar in over the page, like Arc.
+    private var sidebarPeek: some View {
+        SidebarView()
+            .frame(width: sidebarWidth)
+            .background(Theme.sidebarGradient(browser.activeSpace.theme))
+            .clipShape(RoundedRectangle(cornerRadius: Theme.contentCornerRadius, style: .continuous))
+            .shadow(color: .black.opacity(0.25), radius: 12, x: 2)
+            .padding(.vertical, Theme.contentInset)
+            .onHover { if !$0 { isPeekingSidebar = false } }
+            .transition(.slide(from: .leading, reduceMotion: reduceMotion))
+    }
 
-        if isPeekingSidebar {
-            SidebarView()
-                .frame(width: sidebarWidth)
-                .background(Theme.sidebarGradient(browser.activeSpace.theme))
-                .clipShape(RoundedRectangle(cornerRadius: Theme.contentCornerRadius, style: .continuous))
-                .shadow(color: .black.opacity(0.25), radius: 12, x: 2)
-                .padding(.vertical, Theme.contentInset)
-                .onHover { if !$0 { isPeekingSidebar = false } }
-                .transition(.slide(from: .leading, reduceMotion: reduceMotion))
+    private func schedulePeek(isHovering: Bool) {
+        peekTask?.cancel()
+        guard isHovering else { return }
+        // Long enough that pointing at a rail icon to click it doesn't pop the sidebar open.
+        peekTask = Task {
+            try? await Task.sleep(for: .milliseconds(400))
+            if !Task.isCancelled { isPeekingSidebar = true }
         }
     }
 

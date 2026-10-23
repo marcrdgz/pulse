@@ -28,7 +28,7 @@ struct SpaceSwitcher: View {
     }
 }
 
-private struct SpaceDot: View {
+struct SpaceDot: View {
     @Environment(Browser.self) private var browser
     let space: Space
     let isActive: Bool

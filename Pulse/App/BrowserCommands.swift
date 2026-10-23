@@ -61,7 +61,7 @@ struct BrowserCommands: Commands {
         }
 
         CommandGroup(replacing: .sidebar) {
-            Button(browser.isSidebarVisible ? "Hide Sidebar" : "Show Sidebar", action: browser.toggleSidebar)
+            Button(browser.isSidebarExpanded ? "Collapse Sidebar" : "Expand Sidebar", action: browser.toggleSidebar)
                 .keyboardShortcut("s")
         }
 

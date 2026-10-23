@@ -29,7 +29,7 @@ final class Browser {
     private(set) var activeSpaceID: Space.ID
     private(set) var commandBar: CommandBarMode?
     private(set) var toast: String?
-    var isSidebarVisible = true
+    var isSidebarExpanded = true
     private(set) var isFindBarVisible = false
     /// Bumped on every ⌘F so the find bar refocuses its field even when already open.
     private(set) var findBarActivation = 0
@@ -215,10 +215,10 @@ final class Browser {
         openTab(url: InternalPage.downloads.url)
     }
 
-    /// Chrome opens its download bubble when a download starts; with the sidebar hidden there's
+    /// Chrome opens its download bubble when a download starts; with the sidebar collapsed there's
     /// nothing to anchor it to, so a toast says it instead.
     func downloadDidStart(_ download: Download) {
-        if isSidebarVisible {
+        if isSidebarExpanded {
             isDownloadsBubblePresented = true
         } else {
             showToast("Downloading \(download.filename)…")
@@ -520,7 +520,7 @@ final class Browser {
     // MARK: Chrome
 
     func toggleSidebar() {
-        isSidebarVisible.toggle()
+        isSidebarExpanded.toggle()
     }
 
     func showToast(_ message: String) {
