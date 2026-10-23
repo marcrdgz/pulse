@@ -15,6 +15,8 @@ build:
 # Quits a running copy first, otherwise `open` would just focus the stale build.
 run: build
 	-pkill -x Pulse
+	@# pkill doesn't wait; opening while the old copy is still exiting fails with LaunchServices -609.
+	@while pgrep -qx Pulse; do sleep 0.1; done
 	open $(APP)
 
 test:
