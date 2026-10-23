@@ -12,6 +12,10 @@ final class SidebarDragController {
     private(set) var pendingSection: TabSection?
     private(set) var location: CGPoint = .zero
     private(set) var grabOffset: CGSize = .zero
+    /// Whether empty sections show their drop zones. They open only once the pointer leaves the
+    /// dragged tab's section upwards, where they live: opening them on pickup would push the rows
+    /// under the pointer down and turn a quick reorder into a move to the wrong slot.
+    private(set) var showsDropZones = false
 
     // Layout reports; not observed so frame updates don't re-render the sidebar.
     @ObservationIgnored var tabFrames: [Tab.ID: CGRect] = [:]
@@ -31,9 +35,14 @@ final class SidebarDragController {
         }
         self.location = location
 
-        guard let source = browser.position(of: tab),
-              let destination = destination(for: tab, at: location, in: browser)
-        else {
+        guard let source = browser.position(of: tab) else {
+            pendingSection = nil
+            return
+        }
+        if !showsDropZones, hasLeftUpwards(source.section, at: location) {
+            withAnimation(.snappy(duration: 0.22)) { showsDropZones = true }
+        }
+        guard let destination = destination(for: tab, at: location, in: browser) else {
             pendingSection = nil
             return
         }
@@ -64,7 +73,19 @@ final class SidebarDragController {
         withAnimation(.snappy(duration: 0.2)) {
             draggedTabID = nil
             pendingSection = nil
+            showsDropZones = false
         }
+    }
+
+    /// Favorites sit above everything, so zones opening below them never move their tiles.
+    private func hasLeftUpwards(_ section: TabSection, at location: CGPoint) -> Bool {
+        let sectionTop: CGFloat? = switch section {
+        case .favorites: .infinity
+        case .pinned: pinnedAreaFrame?.minY
+        case .today: todayAreaFrame?.minY
+        }
+        guard let sectionTop else { return false }
+        return location.y < sectionTop - 6
     }
 
     func tab(at location: CGPoint, in browser: Browser) -> Tab? {

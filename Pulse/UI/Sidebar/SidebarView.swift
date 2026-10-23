@@ -13,7 +13,7 @@ struct SidebarView: View {
         VStack(alignment: .leading, spacing: 10) {
             SidebarToolbar()
             SidebarAddressBar()
-            if !browser.favorites.isEmpty || dragController.isDragging {
+            if !browser.favorites.isEmpty || dragController.showsDropZones {
                 FavoritesGrid()
                     .transition(.move(edge: .top).combined(with: .opacity))
             }

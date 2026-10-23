@@ -35,7 +35,7 @@ struct SpaceContent: View {
     }
 
     @ViewBuilder private var pinnedSection: some View {
-        let showsDropZone = isActive && dragController.isDragging && space.pinnedTabs.isEmpty
+        let showsDropZone = isActive && dragController.showsDropZones && space.pinnedTabs.isEmpty
         VStack(spacing: 2) {
             if showsDropZone {
                 SidebarDropZone(title: "Drop here to pin", isTargeted: dragController.pendingSection == .pinned)
