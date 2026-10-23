@@ -61,6 +61,21 @@ struct SessionTests {
         try FileManager.default.removeItem(at: store.fileURL.deletingLastPathComponent())
     }
 
+    @Test func keepsAnUnreadableSessionInsteadOfOverwritingIt() throws {
+        let directory = store.fileURL.deletingLastPathComponent()
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        try Data("{not json".utf8).write(to: store.fileURL)
+
+        let browser = Browser(sessionStore: store)
+        browser.openTab(url: URL(string: "https://a.com")!)
+        browser.saveSession()
+
+        #expect(try Data(contentsOf: store.backupURL) == Data("{not json".utf8))
+        #expect(store.load()?.spaces.first?.todayTabs.map(\.url) == [URL(string: "https://a.com")!])
+
+        try FileManager.default.removeItem(at: directory)
+    }
+
     /// Sessions saved before spaces: pinned tabs become favorites, the rest a single "Home" space.
     @Test func migratesSessionsFromBeforeSpaces() throws {
         let legacy = """

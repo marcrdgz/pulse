@@ -1,4 +1,5 @@
 import Foundation
+import OSLog
 
 /// The persisted state of the sidebar: favorites, spaces with their tabs, and what was active.
 struct Session: Codable, Equatable {
@@ -74,9 +75,21 @@ struct SessionStore {
         return SessionStore(fileURL: directory.appending(path: "session.json"))
     }
 
+    /// The file this store moves an unreadable session to, so the next save can't destroy it.
+    var backupURL: URL {
+        fileURL.deletingPathExtension().appendingPathExtension("corrupt.json")
+    }
+
     func load() -> Session? {
         guard let data = try? Data(contentsOf: fileURL) else { return nil }
-        return try? JSONDecoder().decode(Session.self, from: data)
+        do {
+            return try JSONDecoder().decode(Session.self, from: data)
+        } catch {
+            Logger.session.error("Unreadable session, moving it aside: \(error.localizedDescription)")
+            try? FileManager.default.removeItem(at: backupURL)
+            try? FileManager.default.moveItem(at: fileURL, to: backupURL)
+            return nil
+        }
     }
 
     func save(_ session: Session) throws {

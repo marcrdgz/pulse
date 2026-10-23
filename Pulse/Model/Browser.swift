@@ -632,6 +632,6 @@ private extension Session.SavedTab {
     }
 }
 
-private extension Logger {
+extension Logger {
     static let session = Logger(subsystem: "dev.doblefilo.pulse", category: "Session")
 }
