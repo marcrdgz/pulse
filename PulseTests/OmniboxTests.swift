@@ -71,8 +71,19 @@ struct OmniboxTests {
         #expect(suggestions.filter { $0.id == "search:swift" }.count == 1)
     }
 
-    @Test func emptyInputListsOpenTabs() {
-        let tabs = [Tab(url: URL(string: "https://a.com")!), Tab(url: URL(string: "https://b.com")!)]
-        #expect(result("", [], tabs: tabs).suggestions.map(\.id) == tabs.map { "tab:\($0.id)" })
+    @Test func emptyInputListsRecentTabsThenHistoryButNotTheCurrentPage() {
+        let current = Tab(url: URL(string: "https://current.com")!)
+        let older = Tab(url: URL(string: "https://older.com")!)
+        let newer = Tab(url: URL(string: "https://newer.com")!)
+        older.wasShown(at: now.addingTimeInterval(-60))
+        newer.wasShown(at: now)
+        let history = [entry("https://current.com"), entry("https://newer.com"), entry("https://visited.com")]
+
+        let suggestions = Omnibox.result(
+            for: "", history: history, openTabs: [current, older, newer], currentTab: current,
+            searchSuggestions: [], allowsInlineCompletion: true, now: now
+        ).suggestions
+
+        #expect(suggestions.map(\.id) == ["tab:\(newer.id)", "tab:\(older.id)", "url:https://visited.com"])
     }
 }

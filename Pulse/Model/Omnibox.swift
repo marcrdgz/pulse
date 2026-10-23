@@ -39,11 +39,13 @@ struct OmniboxResult {
 enum Omnibox {
     static let maxSuggestions = 8
     static let maxActions = 3
+    static let maxRecentTabs = 5
 
     static func result(
         for input: String,
         history: [HistoryEntry],
         openTabs: [Tab],
+        currentTab: Tab? = nil,
         searchSuggestions: [String],
         actions: [CommandBarAction] = [],
         allowsInlineCompletion: Bool,
@@ -52,7 +54,10 @@ enum Omnibox {
     ) -> OmniboxResult {
         let text = input.trimmingCharacters(in: .whitespaces)
         guard !text.isEmpty else {
-            return OmniboxResult(suggestions: openTabs.prefix(6).map(OmniboxSuggestion.switchTo), inlineCompletion: nil)
+            return OmniboxResult(
+                suggestions: recentSuggestions(history: history, openTabs: openTabs, currentTab: currentTab),
+                inlineCompletion: nil
+            )
         }
         let needle = text.lowercased()
         let ranked = history
@@ -93,6 +98,20 @@ enum Omnibox {
         suggestions.insert(contentsOf: matchingActions, at: min(1, suggestions.count))
 
         return OmniboxResult(suggestions: deduplicated(suggestions), inlineCompletion: inlineCompletion)
+    }
+
+    /// Before anything is typed: the tabs used last, then recently visited pages. The page you're on
+    /// is left out, since switching to it would do nothing.
+    private static func recentSuggestions(history: [HistoryEntry], openTabs: [Tab], currentTab: Tab?) -> [OmniboxSuggestion] {
+        let tabs = openTabs
+            .filter { $0.id != currentTab?.id }
+            .sorted { $0.lastShown > $1.lastShown }
+            .prefix(maxRecentTabs)
+            .map(OmniboxSuggestion.switchTo)
+        let pages = history
+            .filter { $0.url != currentTab?.url }
+            .map { OmniboxSuggestion.navigate($0.url, title: $0.title) }
+        return deduplicated(tabs + pages)
     }
 
     /// Typed addresses dominate, then visit count, all fading with time; matches at the start of

@@ -25,6 +25,7 @@ struct CommandBarView: View {
             for: text,
             history: browser.history?.entries(matching: text) ?? [],
             openTabs: browser.everyTab,
+            currentTab: browser.activeTab,
             searchSuggestions: searchSuggestions,
             actions: browser.commandBarActions,
             allowsInlineCompletion: allowsInlineCompletion,
