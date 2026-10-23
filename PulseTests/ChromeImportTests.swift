@@ -1,6 +1,7 @@
 import Foundation
 import SQLite3
 import Testing
+import WebKit
 @testable import Pulse
 
 struct ChromeImportTests {
@@ -19,14 +20,14 @@ struct ChromeImportTests {
         #expect(ChromeImport.profiles(in: chromeDirectory.appending(path: "Default")).isEmpty)
     }
 
-    @Test func importsBookmarksBarAsPinnedTabsInANewSpace() throws {
+    @Test func importsBookmarksBarAsPinnedTabsInANewSpace() async throws {
         let profile = try makeProfile("Default")
         try writeBookmarks(in: profile)
         let browser = Browser()
 
-        let summary = try browser.importFromChrome(profile, history: false, bookmarks: true)
+        let summary = try await browser.importFromChrome(profile, items: .bookmarks)
 
-        #expect(summary == ChromeImportSummary(bookmarkCount: 3, importedHistory: false))
+        #expect(summary == ChromeImportSummary(bookmarkCount: 3))
         #expect(browser.activeSpace.name == "Chrome")
         #expect(browser.pinnedTabs.map(\.url.absoluteString) == ["https://a.com/", "https://b.com/", "https://c.com/"])
         let titles = browser.pinnedTabs.map(\.displayTitle)
@@ -34,16 +35,16 @@ struct ChromeImportTests {
         #expect(browser.pinnedTabs.filter(\.isPinned).count == 3)
     }
 
-    @Test func importsHistoryWithoutSubframesAndOnlyOnce() throws {
+    @Test func importsHistoryWithoutSubframesAndOnlyOnce() async throws {
         let profile = try makeProfile("Default")
         try writeHistory(in: profile)
         let history = try #require(HistoryStore(path: ":memory:"))
         let browser = Browser(history: history)
 
-        let summary = try browser.importFromChrome(profile, history: true, bookmarks: true)
-        _ = try browser.importFromChrome(profile, history: true, bookmarks: false)
+        let summary = try await browser.importFromChrome(profile, items: [.history, .bookmarks])
+        _ = try await browser.importFromChrome(profile, items: .history)
 
-        #expect(summary == ChromeImportSummary(bookmarkCount: 0, importedHistory: true))
+        #expect(summary == ChromeImportSummary(importedHistory: true))
         #expect(browser.spaces.count == 1)
         #expect(history.visits().map(\.url.absoluteString) == ["https://swift.org/", "https://swift.org/"])
         #expect(history.visits().first?.date == visitDate.addingTimeInterval(60))
@@ -52,6 +53,21 @@ struct ChromeImportTests {
         #expect(entry.visitCount == 2)
         #expect(entry.typedCount == 1)
         #expect(history.entries(matching: "").count == 1)
+    }
+
+    @Test func unreadableCookiesLeaveEverythingUnchanged() async throws {
+        let profile = try makeProfile("Default")
+        try writeBookmarks(in: profile)
+        try writeHistory(in: profile)
+        let history = try #require(HistoryStore(path: ":memory:"))
+        let browser = Browser(history: history)
+        let cookieStore = WKWebsiteDataStore.nonPersistent().httpCookieStore
+
+        await #expect(throws: ChromeImportError.unreadableCookies) {
+            try await browser.importFromChrome(profile, items: [.history, .bookmarks, .cookies], cookieStore: cookieStore)
+        }
+        #expect(browser.spaces.count == 1)
+        #expect(history.visits().isEmpty)
     }
 
     @Test func showsOnboardingOnlyOnFirstLaunch() throws {

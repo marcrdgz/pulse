@@ -71,7 +71,7 @@ struct BrowserWindow: View {
         .sheet(isPresented: Bindable(browser).isChromeImportPresented) {
             ChromeImportView(finishTitle: "Done") { browser.isChromeImportPresented = false }
                 .padding(24)
-                .frame(width: 440, height: 260)
+                .frame(width: 460, height: 320)
                 .environment(browser)
         }
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.willTerminateNotification)) { _ in

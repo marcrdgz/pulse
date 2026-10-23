@@ -15,19 +15,30 @@ struct Bookmark: Equatable {
     let url: URL
 }
 
+struct ChromeImportItems: OptionSet {
+    let rawValue: Int
+
+    static let history = ChromeImportItems(rawValue: 1 << 0)
+    static let bookmarks = ChromeImportItems(rawValue: 1 << 1)
+    static let cookies = ChromeImportItems(rawValue: 1 << 2)
+}
+
 struct ChromeImportSummary: Equatable {
     var bookmarkCount = 0
+    var cookieCount = 0
     var importedHistory = false
 }
 
 enum ChromeImportError: LocalizedError {
     case unreadableBookmarks
     case unreadableHistory
+    case unreadableCookies
 
     var errorDescription: String? {
         switch self {
         case .unreadableBookmarks: "Pulse couldn't read Chrome's bookmarks."
         case .unreadableHistory: "Pulse couldn't read Chrome's history."
+        case .unreadableCookies: "Pulse couldn't read Chrome's cookies."
         }
     }
 }
@@ -77,6 +88,13 @@ enum ChromeImport {
         }
         var seen: Set<URL> = []
         return bookmarks.roots.bookmarkBar.bookmarks.filter { seen.insert($0.url).inserted }
+    }
+
+    /// The profile's cookies, ready for WebKit's cookie store. Every attribute must carry over:
+    /// domain, path, expiry, `Secure`, `HttpOnly` and `SameSite`.
+    static func cookies(of profile: ChromeProfile) throws -> [HTTPCookie] {
+        // TODO: Read the profile's cookies.
+        throw ChromeImportError.unreadableCookies
     }
 
     /// Runs `body` on a copy of the profile's `History` database: Chrome locks its own while running,

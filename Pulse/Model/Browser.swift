@@ -288,19 +288,25 @@ final class Browser {
     }
 
     /// Reads everything first, so a failure leaves the browser unchanged.
+    /// Cookies go to `cookieStore`, the one every tab shares unless a test passes its own.
     func importFromChrome(
         _ profile: ChromeProfile,
-        history includesHistory: Bool,
-        bookmarks includesBookmarks: Bool
-    ) throws -> ChromeImportSummary {
-        let bookmarks = includesBookmarks ? try ChromeImport.bookmarkBar(of: profile) : []
+        items: ChromeImportItems,
+        cookieStore: WKHTTPCookieStore = WKWebsiteDataStore.default().httpCookieStore
+    ) async throws -> ChromeImportSummary {
+        let bookmarks = items.contains(.bookmarks) ? try ChromeImport.bookmarkBar(of: profile) : []
+        let cookies = items.contains(.cookies) ? try ChromeImport.cookies(of: profile) : []
         var summary = ChromeImportSummary()
-        if includesHistory {
+        if items.contains(.history) {
             guard let history else { throw ChromeImportError.unreadableHistory }
             let imported = try ChromeImport.withHistoryCopy(of: profile) { history.importChromeHistory(from: $0) }
             guard imported else { throw ChromeImportError.unreadableHistory }
             summary.importedHistory = true
         }
+        for cookie in cookies {
+            await cookieStore.setCookie(cookie)
+        }
+        summary.cookieCount = cookies.count
         if !bookmarks.isEmpty {
             createSpace(named: "Chrome", pinning: bookmarks)
             summary.bookmarkCount = bookmarks.count

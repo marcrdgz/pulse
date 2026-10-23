@@ -93,6 +93,8 @@ struct ChromeImportView: View {
     @State private var selectedProfile: ChromeProfile?
     @State private var includesHistory = true
     @State private var includesBookmarks = true
+    @State private var includesCookies = false
+    @State private var isImporting = false
     @State private var summary: ChromeImportSummary?
     @State private var errorMessage: String?
 
@@ -109,7 +111,7 @@ struct ChromeImportView: View {
                         .keyboardShortcut(.defaultAction)
                 }
             } else if profiles.isEmpty {
-                Text("Bring over your history, so the address bar suggests the sites you visit, and your bookmarks bar as pinned tabs.")
+                Text("Bring over your history, so the address bar suggests the sites you visit, your bookmarks bar as pinned tabs, and your cookies so you stay signed in.")
                 Text("To allow it, choose the “Chrome” folder in the next window.")
                     .opacity(0.75)
                 errorText
@@ -128,12 +130,20 @@ struct ChromeImportView: View {
                 VStack(alignment: .leading, spacing: 10) {
                     Toggle("History", isOn: $includesHistory)
                     Toggle("Bookmarks bar, as pinned tabs in a “Chrome” space", isOn: $includesBookmarks)
+                    Toggle(isOn: $includesCookies) {
+                        VStack(alignment: .leading, spacing: 1) {
+                            Text("Cookies, to stay signed in to sites")
+                            Text("macOS asks for your password to let Pulse read them. Choose “Allow”, not “Always Allow”.")
+                                .font(.system(size: 11))
+                                .opacity(0.75)
+                        }
+                    }
                 }
                 .toggleStyle(.checkbox)
                 errorText
                 Spacer()
-                buttons(primary: "Import", action: importSelection)
-                    .disabled(!includesHistory && !includesBookmarks)
+                buttons(primary: isImporting ? "Importing…" : "Import", action: importSelection)
+                    .disabled(isImporting || selectedItems.isEmpty)
             }
         }
         .font(.system(size: 13))
@@ -176,13 +186,25 @@ struct ChromeImportView: View {
         errorMessage = nil
     }
 
+    private var selectedItems: ChromeImportItems {
+        var items: ChromeImportItems = []
+        if includesHistory { items.insert(.history) }
+        if includesBookmarks { items.insert(.bookmarks) }
+        if includesCookies { items.insert(.cookies) }
+        return items
+    }
+
     private func importSelection() {
         guard let selectedProfile else { return }
-        do {
-            summary = try browser.importFromChrome(selectedProfile, history: includesHistory, bookmarks: includesBookmarks)
-            errorMessage = nil
-        } catch {
-            errorMessage = error.localizedDescription
+        isImporting = true
+        Task {
+            do {
+                summary = try await browser.importFromChrome(selectedProfile, items: selectedItems)
+                errorMessage = nil
+            } catch {
+                errorMessage = error.localizedDescription
+            }
+            isImporting = false
         }
     }
 }
@@ -195,6 +217,9 @@ private extension ChromeImportSummary {
             let bookmarks = bookmarkCount == 1 ? "1 bookmark" : "\(bookmarkCount) bookmarks"
             parts.append("\(bookmarks) as pinned tabs in the “Chrome” space")
         }
-        return parts.isEmpty ? "There was nothing to import." : "Imported \(parts.joined(separator: " and "))."
+        if cookieCount > 0 {
+            parts.append(cookieCount == 1 ? "1 cookie" : "\(cookieCount) cookies")
+        }
+        return parts.isEmpty ? "There was nothing to import." : "Imported \(parts.formatted(.list(type: .and)))."
     }
 }
