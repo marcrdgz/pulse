@@ -12,6 +12,10 @@ A native macOS browser built on WebKit, with Arc's look and keyboard-first workf
 - Inset rounded web content, collapsible sidebar that peeks in from the left edge.
 - Drag tabs to reorder them, or between Favorites, Pinned and Today; resize the sidebar by its edge.
 - Double-click a tab to rename it; middle-click to close it.
+- Context menus like Chrome's: page links, images and video open in background tabs or another
+  space, "Copy Image Address", searches with your engine, and Copy URL, Share and Print on the page.
+  Tabs can be duplicated, closed below or closed with all others; pinned tabs can keep the current page.
+  Downloads and history rows have their own menus.
 - Session restore; tabs load lazily when first shown.
 - Find in page and a native error page when a site can't load.
 - Links to other apps (`mailto:`, `zoommtg:`…) open in that app, asking first unless clicked; sign-in

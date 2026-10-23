@@ -3,7 +3,9 @@ import WebKit
 
 /// Navigation and UI delegate for a single tab's web view.
 final class WebViewCoordinator: NSObject, WKNavigationDelegate, WKUIDelegate {
-    private weak var tab: Tab?
+    private(set) weak var tab: Tab?
+    /// Set by a context menu item just before WebKit asks for the window it opens.
+    var pendingContextMenuOpen: ContextMenuOpen?
 
     init(tab: Tab) {
         self.tab = tab
@@ -108,6 +110,9 @@ final class WebViewCoordinator: NSObject, WKNavigationDelegate, WKUIDelegate {
         windowFeatures: WKWindowFeatures
     ) -> WKWebView? {
         guard let tab, let browser = tab.browser else { return nil }
+        if let url = navigationAction.request.url, openForContextMenu(url) {
+            return nil
+        }
         if case .newTab(let activate) = LinkTarget(navigationAction), let url = navigationAction.request.url {
             browser.openTab(url: url, activate: activate).opener = tab
             return nil

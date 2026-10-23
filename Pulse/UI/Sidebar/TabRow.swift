@@ -106,9 +106,21 @@ struct TabContextMenu: View {
         if let onRename {
             Button("Rename Tab…", action: onRename)
         }
+        if tab.isPinned, tab.pinnedURL != tab.url, tab.internalPage == nil {
+            Button("Keep Current Page as Pinned") { browser.updatePinnedURL(of: tab) }
+        }
+        Divider()
         Button("Copy URL") { browser.copyURL(of: tab) }
+        ShareLink(item: tab.url)
+        Button("Duplicate Tab") { browser.duplicate(tab) }
         Divider()
         Button(tab.isPinned ? "Reset Pinned Tab" : "Close Tab") { browser.close(tab) }
+        if section == .today, let space = browser.space(containing: tab) {
+            Button("Close Tabs Below") { browser.closeTabs(below: tab) }
+                .disabled(space.todayTabs.last?.id == tab.id)
+            Button("Close Other Tabs") { browser.closeOtherTabs(than: tab) }
+                .disabled(space.todayTabs.count < 2)
+        }
     }
 }
 

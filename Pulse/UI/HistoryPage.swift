@@ -87,6 +87,7 @@ struct HistoryPage: View {
                                     isSelecting: !selection.isEmpty,
                                     toggleSelection: { toggle(visit) },
                                     open: { inBackground in open(visit, inBackground: inBackground) },
+                                    copyLink: { browser.copyLink(visit.url) },
                                     showMoreFromSite: { query = visit.url.displayHost ?? "" },
                                     remove: { browser.history?.deleteVisits([visit.id]) }
                                 )
@@ -179,6 +180,7 @@ private struct HistoryRow: View {
     let isSelecting: Bool
     let toggleSelection: () -> Void
     let open: (_ inBackground: Bool) -> Void
+    let copyLink: () -> Void
     let showMoreFromSite: () -> Void
     let remove: () -> Void
     @State private var isHovered = false
@@ -202,8 +204,7 @@ private struct HistoryRow: View {
                 .lineLimit(1)
             Spacer(minLength: 8)
             Menu {
-                Button("More from This Site", action: showMoreFromSite)
-                Button("Remove from History", action: remove)
+                menuItems
             } label: {
                 Image(systemName: "ellipsis")
             }
@@ -226,6 +227,15 @@ private struct HistoryRow: View {
             }
         }
         .help(visit.url.absoluteString)
+        .contextMenu { menuItems }
+    }
+
+    @ViewBuilder private var menuItems: some View {
+        Button("Open in New Tab") { open(true) }
+        Button("Copy Link", action: copyLink)
+        Divider()
+        Button("More from This Site", action: showMoreFromSite)
+        Button("Remove from History", action: remove)
     }
 }
 

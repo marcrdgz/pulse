@@ -113,6 +113,33 @@ struct DownloadRow: View {
         .contentShape(Rectangle())
         .onHover { isHovered = $0 }
         .onTapGesture { manager.open(download) }
+        .contextMenu { contextMenu }
+    }
+
+    @ViewBuilder private var contextMenu: some View {
+        let isFileAvailable = download.state == .completed && !download.isFileMissing
+        Button("Open") { manager.open(download) }
+            .disabled(!isFileAvailable)
+        Button("Show in Finder") { manager.showInFinder(download) }
+            .disabled(!isFileAvailable)
+        switch download.state {
+        case .inProgress:
+            Button("Pause") { manager.pause(download) }
+            Button("Cancel") { manager.cancel(download) }
+        case .paused:
+            Button("Resume") { manager.resume(download) }
+            Button("Cancel") { manager.cancel(download) }
+        case .failed, .cancelled:
+            Button("Retry") { manager.retry(download) }
+                .disabled(download.sourceURL == nil)
+        case .completed:
+            EmptyView()
+        }
+        Divider()
+        if let source = download.sourceURL {
+            Button("Copy Download Link") { browser.copyLink(source) }
+        }
+        Button("Remove from List") { manager.remove(download) }
     }
 
     @ViewBuilder private var actions: some View {

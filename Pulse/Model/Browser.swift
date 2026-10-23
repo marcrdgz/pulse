@@ -129,10 +129,11 @@ final class Browser {
 
     // MARK: Tabs
 
+    /// Opens at the top of the space's today tabs; activating a tab in another space switches to it.
     @discardableResult
-    func openTab(url: URL, activate: Bool = true) -> Tab {
+    func openTab(url: URL, in space: Space? = nil, activate: Bool = true) -> Tab {
         let tab = makeTab(url: url)
-        activeSpace.todayTabs.insert(tab, at: 0)
+        (space ?? activeSpace).todayTabs.insert(tab, at: 0)
         if activate {
             select(tab)
         } else {
@@ -206,6 +207,41 @@ final class Browser {
         if activeTab == nil {
             commandBar = .newTab
         }
+        scheduleSave()
+    }
+
+    /// Opens the same page in a new today tab right below it (at the top for favorites and pinned tabs).
+    func duplicate(_ tab: Tab) {
+        let copy = makeTab(url: tab.url, title: tab.title)
+        copy.customTitle = tab.customTitle
+        let space = space(containing: tab) ?? activeSpace
+        let index = space.todayTabs.firstIndex { $0.id == tab.id }.map { $0 + 1 } ?? 0
+        space.todayTabs.insert(copy, at: index)
+        select(copy)
+    }
+
+    /// Closes the today tabs under `tab` in its space, like Arc's "Close Tabs Below".
+    func closeTabs(below tab: Tab) {
+        guard let space = space(containing: tab), let index = space.todayTabs.firstIndex(where: { $0.id == tab.id })
+        else { return }
+        space.todayTabs[(index + 1)...].forEach(close)
+    }
+
+    /// Closes every other today tab in `tab`'s space; favorites and pinned tabs stay.
+    func closeOtherTabs(than tab: Tab) {
+        guard let space = space(containing: tab) else { return }
+        space.todayTabs.filter { $0.id != tab.id }.forEach(close)
+    }
+
+    /// Closed one by one so each can be reopened with ⌘⇧T.
+    func closeTodayTabs(in space: Space) {
+        space.todayTabs.forEach(close)
+    }
+
+    /// Makes the page a pinned tab or favorite has navigated to the one it resets to.
+    func updatePinnedURL(of tab: Tab) {
+        guard tab.isPinned else { return }
+        tab.pinnedURL = tab.url
         scheduleSave()
     }
 
@@ -535,9 +571,17 @@ final class Browser {
     }
 
     func copyURL(of tab: Tab) {
+        copy(tab.url, toast: "Copied Current URL")
+    }
+
+    func copyLink(_ url: URL) {
+        copy(url, toast: "Copied Link")
+    }
+
+    private func copy(_ url: URL, toast message: String) {
         NSPasteboard.general.clearContents()
-        NSPasteboard.general.setString(tab.url.absoluteString, forType: .string)
-        showToast("Copied Current URL", sharing: tab.url)
+        NSPasteboard.general.setString(url.absoluteString, forType: .string)
+        showToast(message, sharing: url)
     }
 
     // MARK: Command bar

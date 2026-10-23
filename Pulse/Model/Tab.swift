@@ -65,14 +65,14 @@ final class Tab: Identifiable {
     /// Created on first access so restored and background tabs cost nothing until shown.
     var webView: WKWebView {
         if let loadedWebView { return loadedWebView }
-        let webView = attach(WKWebView(frame: .zero, configuration: Self.makeConfiguration()))
+        let webView = attach(BrowserWebView(frame: .zero, configuration: Self.makeConfiguration()))
         webView.load(URLRequest(url: url))
         return webView
     }
 
     /// Hosts a web view WebKit asked for (`window.open`, `target=_blank`); WebKit drives its loading.
     func adoptWebView(configuration: WKWebViewConfiguration) -> WKWebView {
-        attach(WKWebView(frame: .zero, configuration: configuration))
+        attach(BrowserWebView(frame: .zero, configuration: configuration))
     }
 
     func load(_ url: URL) {

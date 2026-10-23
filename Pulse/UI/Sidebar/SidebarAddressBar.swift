@@ -36,6 +36,15 @@ struct SidebarAddressBar: View {
         .buttonStyle(.plain)
         .onHover { isHovered = $0 }
         .help("Open Location (⌘L)")
+        .contextMenu {
+            if let tab {
+                Button("Edit URL…") { browser.showCommandBar(.editActiveTab) }
+                Button("Copy URL") { browser.copyURL(of: tab) }
+                ShareLink(item: tab.url)
+                Divider()
+                Button("Reload Page") { tab.reload() }
+            }
+        }
     }
 }
 
