@@ -1,0 +1,46 @@
+---
+import { splitCombo } from '../scripts/keys';
+
+// Renders shortcuts like "⌘⇧T" as one keycap per key, the way they're printed on a Mac keyboard.
+interface Props {
+  combos: string[];
+  // How alternatives read: "⌘[ or ⌘]" versus a range like "⌃1 to ⌃9".
+  joiner?: 'or' | 'to';
+}
+
+const { combos, joiner = 'or' } = Astro.props;
+---
+
+<span class="keys">
+  {
+    combos.map((combo, index) => (
+      <>
+        {index > 0 && <span class="joiner">{joiner}</span>}
+        <kbd>
+          {splitCombo(combo).map((key) => (
+            <kbd>{key}</kbd>
+          ))}
+        </kbd>
+      </>
+    ))
+  }
+</span>
+
+<style>
+  .keys {
+    display: inline-flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .keys > kbd {
+    display: inline-flex;
+    gap: 3px;
+  }
+
+  .joiner {
+    font-size: 14px;
+    color: var(--ink-soft);
+  }
+</style>

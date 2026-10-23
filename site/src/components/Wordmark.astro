@@ -1,0 +1,19 @@
+---
+// Inlined so the strokes inherit the surrounding text colour.
+interface Props {
+  class?: string;
+}
+
+const { class: className } = Astro.props;
+---
+
+<svg class={className} xmlns="http://www.w3.org/2000/svg" viewBox="0 0 136 58" role="img" aria-label="Pulse">
+  <g fill="none" stroke="currentColor" stroke-width="6" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M6 16V54" />
+    <circle cx="18" cy="28" r="12" />
+    <path d="M38 16V28A12 12 0 0 0 62 28M62 16V40" />
+    <path d="M72 4V40" />
+    <path d="M100 20C97.5 17 94 16 91 16C86 16 82 18.5 82 22.5C82 31 100 25 100 33.5C100 37.5 96 40 91 40C87.5 40 84.5 38.8 82 36" />
+    <path d="M108 28H132A12 12 0 1 0 128.5 36.5" />
+  </g>
+</svg>

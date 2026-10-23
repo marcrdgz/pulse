@@ -1,0 +1,23 @@
+---
+// The bare mark. `colour` swaps to the brighter ring in dark mode, because the light ring's
+// darkest stop disappears on dark backgrounds. `mono` picks ink or white by scheme.
+interface Props {
+  variant?: 'colour' | 'mono' | 'white';
+  size: number;
+  class?: string;
+}
+
+const { variant = 'colour', size, class: className } = Astro.props;
+const base = import.meta.env.BASE_URL.replace(/\/$/, '');
+const src = (name: string) => `${base}/brand/mark-${name}.svg`;
+const [light, dark] = {
+  colour: ['light', 'dark'],
+  mono: ['ink', 'white'],
+  white: ['white', 'white'],
+}[variant];
+---
+
+<picture class={className}>
+  {dark !== light && <source srcset={src(dark)} media="(prefers-color-scheme: dark)" />}
+  <img src={src(light)} alt="" width={size} height={size} />
+</picture>
