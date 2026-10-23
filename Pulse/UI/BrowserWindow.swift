@@ -49,7 +49,7 @@ struct BrowserWindow: View {
         }
         .ignoresSafeArea()
         .frame(minWidth: 720, minHeight: 460)
-        .background(WindowChrome(showsTrafficLights: browser.isSidebarExpanded || isPeekingSidebar))
+        .background(WindowChrome(browser: browser, showsTrafficLights: browser.isSidebarExpanded || isPeekingSidebar))
         .animation(.snappy(duration: 0.25), value: browser.isSidebarExpanded)
         .animation(.snappy(duration: 0.2), value: isPeekingSidebar)
         .onChange(of: browser.isSidebarExpanded) {
@@ -81,7 +81,9 @@ struct BrowserWindow: View {
 
     private var content: some View {
         VStack(spacing: 0) {
-            DefaultBrowserBanner()
+            if !browser.isPrivate {
+                DefaultBrowserBanner()
+            }
             page
         }
         .clipShape(RoundedRectangle(cornerRadius: Theme.contentCornerRadius, style: .continuous))
@@ -160,6 +162,8 @@ struct BrowserWindow: View {
     private func installControlShortcutMonitor() {
         guard controlShortcutMonitor == nil else { return }
         controlShortcutMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { event in
+            // Every browser window installs a monitor; only the one the key press went to acts.
+            guard event.window === browser.window else { return event }
             let modifiers = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
             if event.keyCode == 48, modifiers.subtracting(.shift) == .control {
                 browser.selectAdjacentTab(offset: modifiers.contains(.shift) ? -1 : 1)
@@ -271,18 +275,8 @@ private struct LinkPreview: View {
 }
 
 /// Window tweaks SwiftUI doesn't expose: drag-from-sidebar and hiding traffic lights with the sidebar.
-/// The browser's own window, so commands can tell it apart from Settings or panels.
-enum BrowserWindowReference {
-    static weak var window: NSWindow?
-
-    /// Whether ⌘W should close the frontmost window instead of a tab.
-    static var isOtherWindowKey: Bool {
-        guard let keyWindow = NSApp.keyWindow else { return false }
-        return keyWindow !== window
-    }
-}
-
 private struct WindowChrome: NSViewRepresentable {
+    let browser: Browser
     let showsTrafficLights: Bool
 
     func makeNSView(context: Context) -> NSView { NSView() }
@@ -291,7 +285,9 @@ private struct WindowChrome: NSViewRepresentable {
         // The view is attached to its window only after this pass.
         DispatchQueue.main.async {
             guard let window = view.window else { return }
-            BrowserWindowReference.window = window
+            browser.window = window
+            // A private window can't come back after relaunch: its browser is gone.
+            window.isRestorable = !browser.isPrivate
             window.titlebarAppearsTransparent = true
             window.isMovableByWindowBackground = false
             for button in [NSWindow.ButtonType.closeButton, .miniaturizeButton, .zoomButton] {

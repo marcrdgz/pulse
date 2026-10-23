@@ -21,11 +21,20 @@ struct PulseApp: App {
         Window("Pulse", id: "browser") {
             BrowserWindow()
                 .environment(browser)
+                .focusedSceneValue(\.browser, browser)
                 .onOpenURL(perform: browser.openExternalURL)
         }
         .windowStyle(.hiddenTitleBar)
         .defaultSize(width: 1280, height: 820)
-        .commands { BrowserCommands(browser: browser) }
+        .commands { BrowserCommands(mainBrowser: browser) }
+
+        WindowGroup("Private Window", id: PrivateBrowserWindow.id) {
+            PrivateBrowserWindow(contentBlocker: browser.contentBlocker, preferences: browser.preferences)
+        }
+        .windowStyle(.hiddenTitleBar)
+        .defaultSize(width: 1280, height: 820)
+        // Links from other apps belong in the main window, never in a new private one.
+        .handlesExternalEvents(matching: [])
 
         Settings {
             SettingsView()

@@ -74,7 +74,7 @@ final class Tab: Identifiable {
     /// Created on first access so restored, background and sleeping tabs cost nothing until shown.
     var webView: WKWebView {
         if let loadedWebView { return loadedWebView }
-        let webView = attach(BrowserWebView(frame: .zero, configuration: Self.makeConfiguration()))
+        let webView = attach(BrowserWebView(frame: .zero, configuration: makeConfiguration()))
         if let hibernatedState {
             webView.interactionState = hibernatedState
         } else {
@@ -252,9 +252,9 @@ final class Tab: Identifiable {
     /// Without a loaded page only the site's `/favicon.ico` is known; used for restored, not-yet-shown tabs.
     func loadFavicon(declaredIconURL: URL? = nil) {
         let pageURL = url
+        let loader = browser?.faviconLoader ?? .shared
         Task { [weak self] in
-            guard let icon = await FaviconLoader.shared.favicon(forPage: pageURL, declaredIconURL: declaredIconURL)
-            else { return }
+            guard let icon = await loader.favicon(forPage: pageURL, declaredIconURL: declaredIconURL) else { return }
             self?.favicon = icon
         }
     }
@@ -310,9 +310,9 @@ final class Tab: Identifiable {
         loadedWebView?.pageZoom = min(max(zoom, 0.3), 3)
     }
 
-    private static func makeConfiguration() -> WKWebViewConfiguration {
+    private func makeConfiguration() -> WKWebViewConfiguration {
         let configuration = WKWebViewConfiguration()
-        configuration.websiteDataStore = .default()
+        configuration.websiteDataStore = browser?.websiteDataStore ?? .default()
         // Without a Safari token some sites (e.g. Google) serve degraded markup to WKWebView.
         configuration.applicationNameForUserAgent = "Version/26.0 Safari/605.1.15"
         configuration.preferences.isElementFullscreenEnabled = true

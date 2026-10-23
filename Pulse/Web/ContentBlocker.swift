@@ -17,7 +17,8 @@ final class ContentBlocker {
     private(set) var ruleLists: [WKContentRuleList] = []
     private(set) var lastUpdate: Date?
 
-    @ObservationIgnored weak var browser: Browser?
+    /// Every window's browser; private windows come and go.
+    @ObservationIgnored private let browsers = NSHashTable<Browser>.weakObjects()
     @ObservationIgnored private let store: WKContentRuleListStore?
     @ObservationIgnored private let defaults: UserDefaults?
     @ObservationIgnored private let preferences: Preferences
@@ -52,9 +53,13 @@ final class ContentBlocker {
         return !preferences.adsAllowedSites.contains { host == $0 || host.hasSuffix("." + $0) }
     }
 
+    func register(_ browser: Browser) {
+        browsers.add(browser)
+    }
+
     func setEnabled(_ isEnabled: Bool) {
         preferences.blocksAdsAndTrackers = isEnabled
-        browser?.contentRulesDidChange()
+        rulesDidChange()
     }
 
     /// Allowing a site also allows its subdomains.
@@ -62,7 +67,7 @@ final class ContentBlocker {
         var sites = Set(preferences.adsAllowedSites)
         if isBlocking { sites.remove(site) } else { sites.insert(site) }
         preferences.adsAllowedSites = sites.sorted()
-        browser?.contentRulesDidChange()
+        rulesDidChange()
     }
 
     /// Loads the lists compiled on a previous launch, then keeps them fresh while Pulse runs.
@@ -136,7 +141,11 @@ final class ContentBlocker {
 
     private func install(_ lists: [WKContentRuleList]) {
         ruleLists = lists
-        browser?.contentRulesDidChange()
+        rulesDidChange()
+    }
+
+    private func rulesDidChange() {
+        browsers.allObjects.forEach { $0.contentRulesDidChange() }
     }
 }
 

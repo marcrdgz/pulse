@@ -54,8 +54,14 @@ final class Browser {
     private(set) var permissionRequests: [PermissionRequest] = []
     private var closedTabs: [ClosedTab] = []
 
+    /// Private windows keep cookies and storage in memory and record no history or session.
+    let isPrivate: Bool
     @ObservationIgnored let downloads: DownloadManager
     @ObservationIgnored let contentBlocker: ContentBlocker
+    @ObservationIgnored let websiteDataStore: WKWebsiteDataStore
+    @ObservationIgnored let faviconLoader: FaviconLoader
+    /// The window showing this browser, so event monitors only act on their own window's events.
+    @ObservationIgnored weak var window: NSWindow?
     @ObservationIgnored let preferences: Preferences
     @ObservationIgnored let history: HistoryStore?
     @ObservationIgnored private let sessionStore: SessionStore?
@@ -78,9 +84,10 @@ final class Browser {
         sitePermissions: SitePermissionStore? = nil,
         downloads: DownloadManager = DownloadManager(),
         contentBlocker: ContentBlocker = ContentBlocker(),
-        preferences: Preferences = Preferences()
+        preferences: Preferences = Preferences(),
+        isPrivate: Bool = false
     ) {
-        let home = Space(name: "Home", theme: .purple)
+        let home = isPrivate ? Space(name: "Private", theme: .graphite) : Space(name: "Home", theme: .purple)
         spaces = [home]
         activeSpaceID = home.id
         self.sessionStore = sessionStore
@@ -89,8 +96,11 @@ final class Browser {
         self.downloads = downloads
         self.contentBlocker = contentBlocker
         self.preferences = preferences
+        self.isPrivate = isPrivate
+        websiteDataStore = isPrivate ? .nonPersistent() : .default()
+        faviconLoader = isPrivate ? .ephemeral : .shared
         downloads.browser = self
-        contentBlocker.browser = self
+        contentBlocker.register(self)
         contentBlocker.start()
         if let session = sessionStore?.load() {
             restore(session)
@@ -101,6 +111,16 @@ final class Browser {
         if activeTab == nil, !isOnboardingPresented {
             commandBar = .newTab
         }
+    }
+
+    /// A private window's browser: nothing it does is written to disk, except downloads.
+    static func makePrivate(contentBlocker: ContentBlocker, preferences: Preferences) -> Browser {
+        Browser(
+            downloads: DownloadManager(preferences: preferences),
+            contentBlocker: contentBlocker,
+            preferences: preferences,
+            isPrivate: true
+        )
     }
 
     var activeSpace: Space {
@@ -260,7 +280,9 @@ final class Browser {
         hibernationTask = Task { [weak self] in
             while !Task.isCancelled {
                 try? await Task.sleep(for: .seconds(60))
-                await self?.hibernateInactiveTabs()
+                // Ends with the browser, which private windows release when they close.
+                guard let self else { return }
+                await hibernateInactiveTabs()
             }
         }
     }

@@ -88,9 +88,10 @@ struct SidebarView: View {
         eventMonitors = []
     }
 
-    /// The event's location in the same top-left window coordinates as SwiftUI's `.global`.
+    /// The event's location in the same top-left window coordinates as SwiftUI's `.global`;
+    /// `nil` for events in other windows, which have sidebars of their own.
     private func windowPoint(of event: NSEvent) -> CGPoint? {
-        guard let contentView = event.window?.contentView else { return nil }
+        guard event.window === browser.window, let contentView = event.window?.contentView else { return nil }
         return CGPoint(x: event.locationInWindow.x, y: contentView.bounds.height - event.locationInWindow.y)
     }
 }

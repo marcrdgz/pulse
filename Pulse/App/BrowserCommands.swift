@@ -3,7 +3,13 @@ import SwiftUI
 
 /// Every keyboard shortcut lives here, as a menu item, mirroring Arc's bindings.
 struct BrowserCommands: Commands {
-    let browser: Browser
+    /// The main window's browser: it imports data, and handles commands while no browser window is key.
+    let mainBrowser: Browser
+    @FocusedValue(\.browser) private var focusedBrowser
+    @Environment(\.openWindow) private var openWindow
+
+    /// Commands act on the key window, which may be a private one.
+    private var browser: Browser { focusedBrowser ?? mainBrowser }
 
     private var activeTab: Tab? { browser.activeTab }
 
@@ -27,15 +33,17 @@ struct BrowserCommands: Commands {
         CommandGroup(replacing: .newItem) {
             Button("New Tab") { browser.showCommandBar(.newTab) }
                 .keyboardShortcut("t")
+            Button("New Private Window") { openWindow(id: PrivateBrowserWindow.id) }
+                .keyboardShortcut("n", modifiers: [.command, .shift])
             Button("Open Location…") { browser.showCommandBar(.editActiveTab) }
                 .keyboardShortcut("l")
             Divider()
             // Replacing the system "Close" item also took ⌘W from Settings and other windows.
             Button(activeTab?.isPinned == true ? "Reset Pinned Tab" : "Close Tab") {
-                if BrowserWindowReference.isOtherWindowKey {
-                    NSApp.keyWindow?.performClose(nil)
+                if let focusedBrowser {
+                    focusedBrowser.closeActiveTab()
                 } else {
-                    browser.closeActiveTab()
+                    NSApp.keyWindow?.performClose(nil)
                 }
             }
             .keyboardShortcut("w")
@@ -50,7 +58,7 @@ struct BrowserCommands: Commands {
             CommandGroup(replacing: .saveItem) {}
 
             CommandGroup(replacing: .importExport) {
-                Button("Import from Chrome…", action: browser.showChromeImport)
+                Button("Import from Chrome…", action: mainBrowser.showChromeImport)
             }
         }
 

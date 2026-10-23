@@ -17,6 +17,8 @@ A native macOS browser built on WebKit, with Arc's look and keyboard-first workf
   space, "Copy Image Address", searches with your engine, and Copy URL, Share and Print on the page.
   Tabs can be duplicated, closed below or closed with all others; pinned tabs can keep the current page.
   Downloads and history rows have their own menus.
+- Private windows (⇧⌘N): cookies and site data live in memory and vanish with the window; no history
+  or session is recorded, and favicons skip the disk cache. Ad blocking and settings are shared.
 - Session restore; tabs load lazily when first shown, and tabs off screen for an hour (configurable)
   sleep to free memory, waking up with their back/forward history. Faded icons mark sleeping tabs.
 - Find in page and a native error page when a site can't load.
@@ -42,6 +44,7 @@ A native macOS browser built on WebKit, with Arc's look and keyboard-first workf
 | Shortcut | Action |
 | --- | --- |
 | ⌘T | New tab (command bar) |
+| ⇧⌘N | New private window |
 | ⌘L | Edit current URL |
 | ⌘W / ⌘⇧T | Close tab (resets pinned tabs) / reopen closed tab |
 | ⌘D | Pin / unpin tab in the current space |
