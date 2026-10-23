@@ -106,6 +106,7 @@ struct SpaceCreationForm: View {
             .popover(isPresented: isIconPickerPresented, arrowEdge: .bottom) {
                 SpaceIconPicker(space: draft)
                     .environment(browser)
+                    .presentationBackground(.thickMaterial)
             }
             TextField("Space name…", text: $draft.name)
                 .textFieldStyle(.plain)

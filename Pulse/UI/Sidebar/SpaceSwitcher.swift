@@ -75,6 +75,7 @@ private struct NewItemButton: View {
             }
             .padding(8)
             .frame(width: 220)
+            .presentationBackground(.thickMaterial)
         }
     }
 }
@@ -171,6 +172,7 @@ struct SpaceDot: View {
         .popover(isPresented: isIconPickerPresented, arrowEdge: .top) {
             SpaceIconPicker(space: space)
                 .environment(browser)
+                .presentationBackground(.thickMaterial)
         }
         .contextMenu { SpaceContextMenu(space: space, canChangeIcon: dragController != nil) }
     }

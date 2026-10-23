@@ -34,6 +34,7 @@ struct DownloadsButton: View {
         .popover(isPresented: $browser.isDownloadsBubblePresented, arrowEdge: .top) {
             DownloadsBubble()
                 .environment(browser)
+                .presentationBackground(.thickMaterial)
         }
     }
 }

@@ -17,7 +17,9 @@ struct ExtensionsButton: View {
         .accessibilityLabel("Extensions")
         .help("Extensions")
         .background(PopoverAnchorView(anchor: anchor))
-        .popover(isPresented: $isMenuPresented, arrowEdge: .bottom) { menu }
+        .popover(isPresented: $isMenuPresented, arrowEdge: .bottom) {
+            menu.presentationBackground(.thickMaterial)
+        }
     }
 
     private var menu: some View {
