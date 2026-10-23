@@ -13,6 +13,8 @@ struct SettingsView: View {
                 .tabItem { Label("Downloads", systemImage: "arrow.down.circle") }
             PrivacySettings()
                 .tabItem { Label("Privacy", systemImage: "hand.raised") }
+            ExtensionSettings()
+                .tabItem { Label("Extensions", systemImage: "puzzlepiece.extension") }
         }
         .frame(width: 520)
     }
@@ -102,6 +104,53 @@ private struct DownloadSettings: View {
                     }
                 }
                 Toggle("Ask where to save each file before downloading", isOn: $preferences.asksWhereToSaveDownloads)
+            }
+        }
+        .formStyle(.grouped)
+    }
+}
+
+private struct ExtensionSettings: View {
+    @Environment(Browser.self) private var browser
+
+    var body: some View {
+        Form {
+            if let extensions = browser.extensions {
+                Section {
+                    if extensions.contexts.isEmpty {
+                        Text("Extensions you add appear here.")
+                            .foregroundStyle(.secondary)
+                    }
+                    ForEach(extensions.contexts, id: \.uniqueIdentifier) { context in
+                        let webExtension = context.webExtension
+                        HStack(spacing: 10) {
+                            if let icon = webExtension.icon(for: CGSize(width: 32, height: 32)) {
+                                Image(nsImage: icon).resizable().frame(width: 32, height: 32)
+                            }
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(webExtension.displayName ?? "Extension")
+                                    .fontWeight(.medium)
+                                Text([webExtension.displayVersion, webExtension.displayDescription].compactMap(\.self).joined(separator: " · "))
+                                    .font(.footnote)
+                                    .foregroundStyle(.secondary)
+                                    .lineLimit(2)
+                            }
+                            Spacer()
+                            if context.optionsPageURL != nil {
+                                Button("Options") { extensions.openOptionsPage(of: context) }
+                            }
+                            Button("Remove") { Task { await extensions.uninstall(context) } }
+                        }
+                    }
+                } footer: {
+                    HStack {
+                        Text("Add extensions from their Chrome Web Store page, or install a folder, ZIP or CRX file.")
+                            .font(.footnote)
+                            .foregroundStyle(.secondary)
+                        Spacer()
+                        Button("Install from File…", action: extensions.chooseAndInstall)
+                    }
+                }
             }
         }
         .formStyle(.grouped)

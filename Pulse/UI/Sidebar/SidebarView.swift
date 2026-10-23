@@ -104,6 +104,9 @@ private struct SidebarToolbar: View {
         let tab = browser.activeTab
         HStack(spacing: 2) {
             Spacer()
+            if let extensions = browser.extensions {
+                ExtensionsButton(extensions: extensions)
+            }
             Button(action: browser.toggleSidebar) {
                 Image(systemName: "sidebar.left")
             }

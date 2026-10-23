@@ -3,7 +3,7 @@ import Observation
 import WebKit
 
 @Observable
-final class Tab: Identifiable {
+final class Tab: NSObject, Identifiable {
     let id: UUID
     private(set) var url: URL
     private(set) var title: String
@@ -31,7 +31,7 @@ final class Tab: Identifiable {
     @ObservationIgnored weak var browser: Browser?
     /// The tab whose page opened this one with `window.open` or `target=_blank`.
     @ObservationIgnored weak var opener: Tab?
-    @ObservationIgnored private var loadedWebView: WKWebView?
+    @ObservationIgnored private(set) var loadedWebView: WKWebView?
     @ObservationIgnored private var coordinator: WebViewCoordinator?
     @ObservationIgnored private var observations: [NSKeyValueObservation] = []
     @ObservationIgnored private var appliedRuleListIDs: [String] = []
@@ -56,6 +56,7 @@ final class Tab: Identifiable {
         self.url = url
         self.title = title
         self.pinnedURL = pinnedURL
+        super.init()
     }
 
     var isPinned: Bool { pinnedURL != nil }
@@ -77,6 +78,7 @@ final class Tab: Identifiable {
     func toggleMuted() {
         isMuted.toggle()
         if let loadedWebView { PageAudio.setMuted(isMuted, in: loadedWebView) }
+        browser?.extensions?.controller.didChangeTabProperties(.muted, for: self)
     }
 
     var displayTitle: String {
@@ -284,7 +286,7 @@ final class Tab: Identifiable {
         loadedWebView = webView
         applyContentRules(forPageAt: url)
         if isMuted { PageAudio.setMuted(true, in: webView) }
-        audioObservation = PageAudio.observe(webView) { [weak self] isPlaying in self?.isPlayingAudio = isPlaying }
+        audioObservation = PageAudio.observe(webView) { [weak self] isPlaying in self?.audioDidChange(isPlaying: isPlaying) }
 
         observations = [
             webView.observe(\.url) { [weak self] _, _ in MainActor.assumeIsolated { self?.syncWithWebView() } },
@@ -299,20 +301,30 @@ final class Tab: Identifiable {
         return webView
     }
 
+    private func audioDidChange(isPlaying: Bool) {
+        guard isPlaying != isPlayingAudio else { return }
+        isPlayingAudio = isPlaying
+        browser?.extensions?.controller.didChangeTabProperties(.playingAudio, for: self)
+    }
+
     private func syncWithWebView() {
         guard let webView = loadedWebView else { return }
         var didChangePage = false
+        var changes: WKWebExtension.TabChangedProperties = []
         if let newURL = webView.url, newURL != url {
             url = newURL
             didChangePage = true
+            changes.insert(.URL)
             // Same-document navigations (pushState) never commit, but Chrome still records them.
             if !webView.isLoading { browser?.recordVisit(to: self, title: webView.title ?? "") }
         }
         if let newTitle = webView.title, newTitle != title {
             title = newTitle
             didChangePage = true
+            changes.insert(.title)
             browser?.tabTitleDidChange(self)
         }
+        if webView.isLoading != isLoading { changes.insert(.loading) }
         isLoading = webView.isLoading
         estimatedProgress = webView.estimatedProgress
         canGoBack = webView.canGoBack
@@ -320,6 +332,7 @@ final class Tab: Identifiable {
         cameraCaptureState = webView.cameraCaptureState
         microphoneCaptureState = webView.microphoneCaptureState
         if didChangePage { browser?.tabDidUpdate() }
+        if !changes.isEmpty { browser?.extensions?.controller.didChangeTabProperties(changes, for: self) }
     }
 
     private func setZoom(_ zoom: CGFloat) {
@@ -327,7 +340,10 @@ final class Tab: Identifiable {
     }
 
     private func makeConfiguration() -> WKWebViewConfiguration {
-        let configuration = WKWebViewConfiguration()
+        let extensions = browser?.extensions
+        // An extension's own pages (its options, say) only load with the configuration WebKit made for them.
+        let configuration = extensions?.webViewConfiguration(forPageAt: url) ?? WKWebViewConfiguration()
+        configuration.webExtensionController = extensions?.controller
         configuration.websiteDataStore = browser?.websiteDataStore ?? .default()
         // Without a Safari token some sites (e.g. Google) serve degraded markup to WKWebView.
         configuration.applicationNameForUserAgent = "Version/26.0 Safari/605.1.15"

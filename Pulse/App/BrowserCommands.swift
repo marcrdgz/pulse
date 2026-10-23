@@ -59,6 +59,9 @@ struct BrowserCommands: Commands {
 
             CommandGroup(replacing: .importExport) {
                 Button("Import from Chrome…", action: mainBrowser.showChromeImport)
+                if let extensions = mainBrowser.extensions {
+                    Button("Install Extension…", action: extensions.chooseAndInstall)
+                }
             }
         }
 

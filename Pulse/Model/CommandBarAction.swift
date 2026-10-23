@@ -13,6 +13,7 @@ struct CommandBarAction: Identifiable {
         case toggleMuted
         case findOnPage
         case toggleContentBlocking
+        case addExtension(id: String)
         case moveTab(to: Space.ID)
         case switchToSpace(Space.ID)
         case newSpace
@@ -83,6 +84,14 @@ extension Browser {
                     symbol: isBlocking ? "shield.slash" : "shield",
                     keywords: ["adblock", "blocker", "trackers"]
                 ))
+            }
+            if extensions != nil, let id = ChromeWebStore.extensionID(fromStorePage: tab.url) {
+                actions.insert(Action(
+                    kind: .addExtension(id: id),
+                    title: "Add Extension to Pulse",
+                    symbol: "puzzlepiece.extension",
+                    keywords: ["install", "chrome", "store"]
+                ), at: 0)
             }
             actions += otherSpaces.map { space in
                 Action(
@@ -165,6 +174,7 @@ extension Browser {
         case .toggleMuted: tab?.toggleMuted()
         case .findOnPage: showFindBar()
         case .toggleContentBlocking: if let tab { toggleContentBlocking(on: tab) }
+        case .addExtension(let id): if let extensions { Task { await extensions.install(.chromeWebStore(id: id)) } }
         case .moveTab(let spaceID):
             if let tab, let space = spaces.first(where: { $0.id == spaceID }) { moveTab(tab, to: space) }
         case .switchToSpace(let spaceID):

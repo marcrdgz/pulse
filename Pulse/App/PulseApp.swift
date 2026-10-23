@@ -5,15 +5,21 @@ struct PulseApp: App {
     @State private var browser: Browser = {
         let preferences = Preferences(defaults: .standard)
         let supportDirectory = URL.applicationSupportDirectory.appending(path: "Pulse", directoryHint: .isDirectory)
+        let extensions = WebExtensions(
+            directory: supportDirectory.appending(path: "Extensions", directoryHint: .isDirectory),
+            defaults: .standard
+        )
         let browser = Browser(
             sessionStore: .standard,
             history: .standard(),
             sitePermissions: SitePermissionStore(defaults: .standard),
             downloads: DownloadManager(recordsURL: supportDirectory.appending(path: "Downloads.json"), preferences: preferences),
             contentBlocker: ContentBlocker(store: .default(), defaults: .standard, preferences: preferences),
+            extensions: extensions,
             preferences: preferences
         )
         browser.startHibernatingInactiveTabs()
+        Task { await extensions.loadInstalled() }
         return browser
     }()
 

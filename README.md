@@ -37,6 +37,10 @@ A native macOS browser built on WebKit, with Arc's look and keyboard-first workf
   location prompt, per-site camera/microphone permissions.
 - Ad and tracker blocking with EasyList and EasyPrivacy, compiled into WebKit content rules and
   refreshed every four days; allow ads per site from the address bar's menu.
+- Extensions (Chrome and Safari WebExtensions, via WebKit): add one from its Chrome Web Store page
+  ("Add Extension to Pulse" in the command bar or the extensions menu), or File › Install Extension…
+  with a folder, ZIP or CRX. The puzzle button in the sidebar runs their actions and popups; manage
+  them in Settings › Extensions. Private windows run no extensions.
 - History like Chrome's: ⌘Y page grouped by day with search and multi-select delete, a History menu
   with recently closed tabs and visits, and "Clear Browsing Data" (⌘⇧⌫).
 

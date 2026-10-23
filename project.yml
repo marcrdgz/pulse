@@ -2,7 +2,7 @@ name: Pulse
 options:
   bundleIdPrefix: dev.doblefilo
   deploymentTarget:
-    macOS: "14.0"
+    macOS: "15.4"
   createIntermediateGroups: true
 settings:
   base:

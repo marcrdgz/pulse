@@ -28,7 +28,7 @@ enum CommandBarMode: Hashable {
 }
 
 @Observable
-final class Browser {
+final class Browser: NSObject {
     /// Shared by every space, shown as the favicon grid.
     private(set) var favorites: [Tab] = []
     /// Never empty.
@@ -58,6 +58,8 @@ final class Browser {
     let isPrivate: Bool
     @ObservationIgnored let downloads: DownloadManager
     @ObservationIgnored let contentBlocker: ContentBlocker
+    /// `nil` in private windows, which run no extensions.
+    @ObservationIgnored let extensions: WebExtensions?
     @ObservationIgnored let websiteDataStore: WKWebsiteDataStore
     @ObservationIgnored let faviconLoader: FaviconLoader
     /// The window showing this browser, so event monitors only act on their own window's events.
@@ -84,6 +86,7 @@ final class Browser {
         sitePermissions: SitePermissionStore? = nil,
         downloads: DownloadManager = DownloadManager(),
         contentBlocker: ContentBlocker = ContentBlocker(),
+        extensions: WebExtensions? = nil,
         preferences: Preferences = Preferences(),
         isPrivate: Bool = false
     ) {
@@ -95,10 +98,12 @@ final class Browser {
         self.sitePermissions = sitePermissions
         self.downloads = downloads
         self.contentBlocker = contentBlocker
+        self.extensions = extensions
         self.preferences = preferences
         self.isPrivate = isPrivate
         websiteDataStore = isPrivate ? .nonPersistent() : .default()
         faviconLoader = isPrivate ? .ephemeral : .shared
+        super.init()
         downloads.browser = self
         contentBlocker.register(self)
         contentBlocker.start()
@@ -111,6 +116,7 @@ final class Browser {
         if activeTab == nil, !isOnboardingPresented {
             commandBar = .newTab
         }
+        extensions?.register(self)
     }
 
     /// A private window's browser: nothing it does is written to disk, except downloads.
@@ -160,6 +166,7 @@ final class Browser {
     func openTab(url: URL, in space: Space? = nil, activate: Bool = true) -> Tab {
         let tab = makeTab(url: url)
         (space ?? activeSpace).todayTabs.insert(tab, at: 0)
+        extensions?.controller.didOpenTab(tab)
         if activate {
             select(tab)
         } else {
@@ -183,13 +190,21 @@ final class Browser {
 
     /// Selecting a tab from another space switches to that space.
     func select(_ tab: Tab?) {
-        activeTab?.wasShown(at: .now)
+        let previous = activeTab
+        previous?.wasShown(at: .now)
         if let tab, let owner = space(containing: tab), owner.id != activeSpaceID {
             activeSpaceID = owner.id
         }
         if tab?.id != activeTabID { isFindBarVisible = false }
         activeSpace.activeTabID = tab?.id
+        activeTabDidChange(from: previous)
         scheduleSave()
+    }
+
+    /// `chrome.tabs.onActivated` fires from this, so extensions follow the tab on screen.
+    private func activeTabDidChange(from previous: Tab?) {
+        guard let extensions, let tab = activeTab, tab !== previous else { return }
+        extensions.controller.didActivateTab(tab, previousActiveTab: previous)
     }
 
     func selectTab(number: Int) {
@@ -211,6 +226,7 @@ final class Browser {
 
     /// Favorites and pinned tabs are never removed: closing one resets it to its pinned page, like Arc.
     func close(_ tab: Tab) {
+        let previous = activeTab
         denyPermissionRequests(from: tab)
         if tab.isPinned {
             tab.resetToPinnedURL()
@@ -218,6 +234,7 @@ final class Browser {
         } else if let space = space(containing: tab),
                   let index = space.todayTabs.firstIndex(where: { $0.id == tab.id }) {
             space.todayTabs.remove(at: index)
+            extensions?.controller.didCloseTab(tab, windowIsClosing: false)
             tab.unload()
             if tab.url.absoluteString != "about:blank" {
                 closedTabs.append(ClosedTab(url: tab.url, title: tab.title, spaceID: space.id, index: index))
@@ -234,6 +251,7 @@ final class Browser {
         if activeTab == nil {
             commandBar = .newTab
         }
+        activeTabDidChange(from: previous)
         scheduleSave()
     }
 
@@ -244,6 +262,7 @@ final class Browser {
         let space = space(containing: tab) ?? activeSpace
         let index = space.todayTabs.firstIndex { $0.id == tab.id }.map { $0 + 1 } ?? 0
         space.todayTabs.insert(copy, at: index)
+        extensions?.controller.didOpenTab(copy)
         select(copy)
     }
 
@@ -475,6 +494,7 @@ final class Browser {
         let space = spaces.first { $0.id == closed.spaceID } ?? activeSpace
         let tab = makeTab(url: closed.url, title: closed.title)
         space.todayTabs.insert(tab, at: min(closed.index, space.todayTabs.count))
+        extensions?.controller.didOpenTab(tab)
         commandBar = nil
         select(tab)
     }
@@ -511,6 +531,7 @@ final class Browser {
     /// Moves a tab into the favorites or a section of the active space, pinning or unpinning it
     /// as needed. `destination.index` counts the section's tabs without the moved one.
     func moveTab(_ tab: Tab, to destination: TabPosition) {
+        let wasPinned = tab.isPinned
         guard detach(tab) else { return }
         switch destination.section {
         case .favorites:
@@ -523,6 +544,7 @@ final class Browser {
             tab.pinnedURL = nil
             activeSpace.todayTabs.insert(tab, at: min(destination.index, activeSpace.todayTabs.count))
         }
+        if tab.isPinned != wasPinned { extensions?.controller.didChangeTabProperties(.pinned, for: tab) }
         scheduleSave()
     }
 
@@ -588,10 +610,12 @@ final class Browser {
 
     func selectSpace(_ space: Space) {
         guard space.id != activeSpaceID, spaces.contains(where: { $0.id == space.id }) else { return }
-        activeTab?.wasShown(at: .now)
+        let previous = activeTab
+        previous?.wasShown(at: .now)
         activeSpaceID = space.id
         isFindBarVisible = false
         commandBar = nil
+        activeTabDidChange(from: previous)
         scheduleSave()
     }
 
@@ -631,12 +655,17 @@ final class Browser {
     /// Closes the space's pinned and today tabs; favorites stay. The last space can't be deleted.
     func delete(_ space: Space) {
         guard spaces.count > 1, let index = spaces.firstIndex(where: { $0.id == space.id }) else { return }
-        space.tabs.forEach { $0.unload() }
+        let previous = activeTab
         spaces.remove(at: index)
+        for tab in space.tabs {
+            extensions?.controller.didCloseTab(tab, windowIsClosing: false)
+            tab.unload()
+        }
         if activeSpaceID == space.id {
             activeSpaceID = spaces[min(index, spaces.count - 1)].id
             isFindBarVisible = false
         }
+        activeTabDidChange(from: previous)
         scheduleSave()
     }
 
