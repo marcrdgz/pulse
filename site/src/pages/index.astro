@@ -15,7 +15,7 @@ const spaces = [
 ];
 
 // The headline rises in word by word; each word carries its place in the sequence.
-const headline = [['Arc', 'was', 'a', 'good', 'idea.'], ['So', 'we', 'kept', 'it']];
+const headline = [['Arc', 'was', 'a', 'good', 'idea.'], ['So', 'we', 'built', 'it']];
 
 const tour: { note: string; keys?: string; title: string; body: string; space: string; scene: Scene }[] = [
   {
@@ -193,13 +193,12 @@ const shortcutGroups = [
 
     <div class="container bento">
       <article class="tile wide">
-        <div class="stack" aria-hidden="true">
-          <span>Pulse, in Swift</span>
-          <span>WebKit</span>
-          <span>macOS</span>
+        <div class="sizes" aria-hidden="true">
+          <div class="dl"><b>Pulse.app</b><small>12 MB</small><span class="bar"><i style="width:2%"></i></span></div>
+          <div class="dl chrome"><b>Google Chrome.app</b><small>720 MB</small><span class="bar"><i style="width:100%"></i></span></div>
         </div>
         <h3>WebKit, not Chromium.</h3>
-        <p>Pulse runs on the engine already inside your Mac, the one Safari uses. No Electron, no second copy of Chrome to download and update.</p>
+        <p>Pulse runs on the engine already inside your Mac, the one Safari uses, so the whole app is 12 MB. Chrome brings its own and weighs in around 720 MB.</p>
       </article>
 
       <article class="tile wide">
@@ -245,6 +244,64 @@ const shortcutGroups = [
       only when you open them, renaming tabs with a double-click, middle-click to close, link previews
       in the corner, VoiceOver labels and fades when Reduce Motion is on.
     </p>
+  </section>
+
+  <section id="security" class="section">
+    <header class="container section-head">
+      <h2>Secure from the start<span class="flare">.</span></h2>
+      <p>The safe choice is the default one, so there is nothing to go looking for in Settings.</p>
+    </header>
+
+    <div class="container bento">
+      <article class="tile wide">
+        <div class="permissions" aria-hidden="true">
+          <span>news.example.com</span>
+          <span>Block ads and trackers <b class="toggle on"></b></span>
+          <span>Clear cookies and site data <b class="toggle"></b></span>
+        </div>
+        <h3>Ads and trackers, blocked.</h3>
+        <p>EasyList and EasyPrivacy run inside WebKit’s content blocker and refresh every four days. Turn blocking off for a site from the address bar.</p>
+      </article>
+
+      <article class="tile wide">
+        <div class="checks" aria-hidden="true">
+          <span><s>http://example.com</s><small>upgraded</small></span>
+          <span>https://example.com <b>secure</b></span>
+        </div>
+        <h3>HTTPS first.</h3>
+        <p>Pulse opens every address over HTTPS and only falls back to HTTP when a site has no secure version.</p>
+      </article>
+
+      <article class="tile">
+        <div class="checks" aria-hidden="true">
+          <span>App Sandbox <b>on</b></span>
+          <span>Hardened runtime <b>on</b></span>
+          <span>WebKit page sandbox <b>on</b></span>
+        </div>
+        <h3>Sandboxed, like Safari.</h3>
+        <p>Pulse runs in the macOS App Sandbox, and every page renders in WebKit’s own sandboxed processes.</p>
+      </article>
+
+      <article class="tile">
+        <div class="checks" aria-hidden="true">
+          <span>History <small>not kept</small></span>
+          <span>Cookies <small>in memory</small></span>
+          <span>Extensions <small>off</small></span>
+        </div>
+        <h3>Private windows forget.</h3>
+        <p>⇧⌘N opens a window that keeps cookies only in memory, records no history and runs no extensions.</p>
+      </article>
+
+      <article class="tile">
+        <div class="checks" aria-hidden="true">
+          <span>Analytics <small>none</small></span>
+          <span>Suggestions <small>no cookies</small></span>
+          <span>Favicons <small>no cookies</small></span>
+        </div>
+        <h3>Nothing phones home.</h3>
+        <p>Pulse collects no analytics. Search suggestions and site icons are fetched without your cookies, and suggestions are never cached.</p>
+      </article>
+    </div>
   </section>
 
   <section id="shortcuts" class="section">

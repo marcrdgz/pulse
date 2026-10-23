@@ -641,24 +641,6 @@ kbd:has(> kbd) {
   font-size: 14px;
 }
 
-.stack span {
-  padding: 12px 16px;
-  border-radius: 12px;
-  font-weight: 600;
-  text-align: center;
-  background: color-mix(in oklab, var(--accent) 12%, transparent);
-}
-
-.stack span:first-child {
-  color: var(--button-ink);
-  background: var(--accent);
-}
-
-.stack span:last-child {
-  color: var(--dim);
-  background: color-mix(in oklab, var(--ink) 6%, transparent);
-}
-
 .dl {
   display: grid;
   grid-template-columns: 1fr auto;
@@ -666,6 +648,10 @@ kbd:has(> kbd) {
   padding: 12px 14px;
   border-radius: 12px;
   background: color-mix(in oklab, var(--ink) 5%, transparent);
+}
+
+.dl.chrome .bar i {
+  background: color-mix(in oklab, var(--ink) 22%, transparent);
 }
 
 .dl small,
@@ -688,7 +674,8 @@ kbd:has(> kbd) {
 }
 
 .history span,
-.permissions span {
+.permissions span,
+.checks span {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -700,6 +687,15 @@ kbd:has(> kbd) {
 
 .history small {
   margin-top: 4px;
+}
+
+.checks small,
+.checks s {
+  color: var(--dim);
+}
+
+.checks b {
+  color: #34c759;
 }
 
 .cam {
