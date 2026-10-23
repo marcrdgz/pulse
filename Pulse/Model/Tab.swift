@@ -363,6 +363,8 @@ final class Tab: NSObject, Identifiable {
         configuration.websiteDataStore = browser?.websiteDataStore ?? .default()
         // Without a Safari token some sites (e.g. Google) serve degraded markup to WKWebView.
         configuration.applicationNameForUserAgent = "Version/26.0 Safari/605.1.15"
+        // HTTPS first, like Safari: http pages load over https when the server supports it.
+        configuration.defaultWebpagePreferences.preferredHTTPSNavigationPolicy = .automaticFallbackToHTTP
         configuration.preferences.isElementFullscreenEnabled = true
         // `isInspectable` only allows Safari's remote inspector; the in-app one also needs developer extras.
         configuration.preferences.setValue(true, forKey: "developerExtrasEnabled")

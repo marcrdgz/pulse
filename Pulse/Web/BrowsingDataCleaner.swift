@@ -48,6 +48,14 @@ enum BrowsingDataCleaner {
         if selection.history {
             history?.deleteVisits(since: since)
         }
+        if selection.history || selection.cache {
+            // Pulse's own cache holds favicons, which name the sites visited.
+            if let since { URLCache.shared.removeCachedResponses(since: since) } else { URLCache.shared.removeAllCachedResponses() }
+        }
+        if selection.cookies {
+            // Favicon and suggestion requests no longer leave cookies here, but earlier versions did.
+            HTTPCookieStorage.shared.removeCookies(since: since ?? .distantPast)
+        }
         var types: Set<String> = []
         if selection.cookies { types.formUnion(WKWebsiteDataStore.allWebsiteDataTypes().subtracting(cacheTypes)) }
         if selection.cache { types.formUnion(cacheTypes) }

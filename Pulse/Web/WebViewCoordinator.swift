@@ -6,6 +6,10 @@ final class WebViewCoordinator: NSObject, WKNavigationDelegate, WKUIDelegate {
     private(set) weak var tab: Tab?
     /// Set by a context menu item just before WebKit asks for the window it opens.
     var pendingContextMenuOpen: ContextMenuOpen?
+    /// JavaScript dialogs shown since the page committed; from the second on, each offers to
+    /// silence the page, like Safari, so a dialog loop can't trap the window.
+    private var dialogCount = 0
+    private var suppressesDialogs = false
 
     init(tab: Tab) {
         self.tab = tab
@@ -93,6 +97,8 @@ final class WebViewCoordinator: NSObject, WKNavigationDelegate, WKUIDelegate {
     }
 
     func webView(_ webView: WKWebView, didCommit navigation: WKNavigation!) {
+        dialogCount = 0
+        suppressesDialogs = false
         guard let tab else { return }
         tab.browser?.recordVisit(to: tab)
     }
@@ -131,13 +137,18 @@ final class WebViewCoordinator: NSObject, WKNavigationDelegate, WKUIDelegate {
         type: WKMediaCaptureType,
         decisionHandler: @escaping @MainActor @Sendable (WKPermissionDecision) -> Void
     ) {
-        guard let tab, let browser = tab.browser else {
+        // Like Chrome, an embedded frame asks on behalf of the page's site, which the prompt names
+        // and the decision is remembered under: a grant to meet.google.com never extends to pages
+        // embedding it. The back-forward item is the committed page; `url` may already name one
+        // still loading.
+        let site = frame.isMainFrame ? origin.displayName : webView.backForwardList.currentItem?.url.permissionOrigin
+        guard let tab, let browser = tab.browser, let site else {
             decisionHandler(.deny)
             return
         }
         browser.requestPermission(
             from: tab,
-            origin: origin.displayName,
+            origin: site,
             kinds: PermissionKind.kinds(for: type),
             respond: decisionHandler
         )
@@ -152,7 +163,7 @@ final class WebViewCoordinator: NSObject, WKNavigationDelegate, WKUIDelegate {
         runJavaScriptAlertPanelWithMessage message: String,
         initiatedByFrame frame: WKFrameInfo
     ) async {
-        _ = makeAlert(message: message, frame: frame).runModal()
+        _ = await present(makeAlert(message: message, frame: frame), in: webView)
     }
 
     func webView(
@@ -163,7 +174,7 @@ final class WebViewCoordinator: NSObject, WKNavigationDelegate, WKUIDelegate {
         let alert = makeAlert(message: message, frame: frame)
         alert.addButton(withTitle: "OK")
         alert.addButton(withTitle: "Cancel")
-        return alert.runModal() == .alertFirstButtonReturn
+        return await present(alert, in: webView) == .alertFirstButtonReturn
     }
 
     func webView(
@@ -179,7 +190,7 @@ final class WebViewCoordinator: NSObject, WKNavigationDelegate, WKUIDelegate {
         alert.addButton(withTitle: "OK")
         alert.addButton(withTitle: "Cancel")
         alert.window.initialFirstResponder = field
-        return alert.runModal() == .alertFirstButtonReturn ? field.stringValue : nil
+        return await present(alert, in: webView) == .alertFirstButtonReturn ? field.stringValue : nil
     }
 
     func webView(
@@ -231,6 +242,20 @@ final class WebViewCoordinator: NSObject, WKNavigationDelegate, WKUIDelegate {
         alert.window.initialFirstResponder = user.stringValue.isEmpty ? user : password
         guard alert.runModal() == .alertFirstButtonReturn else { return nil }
         return URLCredential(user: user.stringValue, password: password.stringValue, persistence: .forSession)
+    }
+
+    /// A sheet on the page's window rather than an app-modal alert, so other windows stay usable.
+    /// `nil` when the page has been silenced or has no window to show it in.
+    private func present(_ alert: NSAlert, in webView: WKWebView) async -> NSApplication.ModalResponse? {
+        guard !suppressesDialogs, let window = webView.window ?? tab?.browser?.window else { return nil }
+        dialogCount += 1
+        if dialogCount > 1 {
+            alert.showsSuppressionButton = true
+            alert.suppressionButton?.title = "Prevent this page from creating additional dialogs"
+        }
+        let response = await alert.beginSheetModal(for: window)
+        if alert.suppressionButton?.state == .on { suppressesDialogs = true }
+        return response
     }
 
     private func makeAlert(message: String, frame: WKFrameInfo) -> NSAlert {

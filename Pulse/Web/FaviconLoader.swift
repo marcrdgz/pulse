@@ -2,9 +2,14 @@ import AppKit
 
 /// Fetches and caches favicons per host.
 final class FaviconLoader {
-    static let shared = FaviconLoader(session: .shared)
+    /// Cached on disk, which Clear Browsing Data empties along with history.
+    static let shared = FaviconLoader(session: URLSession(configuration: .cookieless(cache: .shared)))
     /// For private windows: icons stay in memory instead of the shared disk cache.
-    static let ephemeral = FaviconLoader(session: URLSession(configuration: .ephemeral))
+    static let ephemeral = FaviconLoader(session: URLSession(configuration: .cookieless(cache: nil)))
+
+    /// Icons are decoded in Pulse's own process, outside WebKit's sandbox, so larger files
+    /// (no real favicon comes close) aren't handed to the image decoders at all.
+    private static let maximumIconSize = 512 * 1024
 
     /// Evaluated in the page: the icon it declares, or an empty string.
     static let declaredIconScript = """
@@ -26,6 +31,7 @@ final class FaviconLoader {
         let candidates = [declaredIconURL, URL(string: "/favicon.ico", relativeTo: pageURL)?.absoluteURL]
         for case let iconURL? in candidates {
             guard let (data, _) = try? await session.data(from: iconURL),
+                  data.count <= Self.maximumIconSize,
                   let icon = NSImage(data: data), icon.isValid
             else { continue }
             iconsByHost[host] = icon

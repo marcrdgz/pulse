@@ -266,6 +266,7 @@ private struct SuggestionRow: View {
 
 /// A favicon for a URL that may not be open in any tab, e.g. in history or suggestions.
 struct URLFavicon: View {
+    @Environment(Browser.self) private var browser
     let url: URL
     @State private var icon: NSImage?
 
@@ -279,7 +280,7 @@ struct URLFavicon: View {
         }
         .frame(width: 16, height: 16)
         .task(id: url.host()) {
-            icon = await FaviconLoader.shared.favicon(forPage: url, declaredIconURL: nil)
+            icon = await browser.faviconLoader.favicon(forPage: url, declaredIconURL: nil)
         }
     }
 }
