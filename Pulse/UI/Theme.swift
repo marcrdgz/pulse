@@ -41,6 +41,8 @@ enum Theme {
     static let sidebarText = Color.dynamic(light: NSColor(hex: 0x1F1B33), dark: NSColor(hex: 0xF2F0FA))
     static let activeTabFill = Color.dynamic(light: .white.withAlphaComponent(0.85), dark: .white.withAlphaComponent(0.16))
     static let hoverFill = Color.dynamic(light: .white.withAlphaComponent(0.3), dark: .white.withAlphaComponent(0.07))
+    /// Arc darkens behind a hovered icon instead of lightening, which reads on pale themes too.
+    static let iconHoverFill = Color.dynamic(light: .black.withAlphaComponent(0.08), dark: .white.withAlphaComponent(0.12))
     static let pillFill = Color.dynamic(light: .white.withAlphaComponent(0.4), dark: .white.withAlphaComponent(0.09))
 }
 
@@ -63,10 +65,10 @@ struct SidebarIconButtonStyle: ButtonStyle {
             configuration.label
                 .frame(minWidth: size, minHeight: size)
                 .background(
-                    // Fades rather than snapping, and lighter than a tab row's hover.
+                    // Fades rather than snapping.
                     RoundedRectangle(cornerRadius: 6, style: .continuous)
-                        .fill(Theme.hoverFill)
-                        .opacity(isHovered && isEnabled ? 0.7 : 0)
+                        .fill(Theme.iconHoverFill)
+                        .opacity(isHovered && isEnabled ? 1 : 0)
                         .animation(.easeOut(duration: 0.15), value: isHovered)
                 )
                 .contentShape(Rectangle())
