@@ -10,20 +10,23 @@ struct DownloadsButton: View {
     var body: some View {
         @Bindable var browser = browser
         Button { browser.isDownloadsBubblePresented.toggle() } label: {
-            ZStack {
-                Image(systemName: "arrow.down")
-                    .font(.system(size: 10, weight: .bold))
-                Circle()
-                    .stroke(Theme.sidebarText.opacity(0.25), lineWidth: 1.5)
-                if let progress = browser.downloads.activeProgress {
+            if let progress = browser.downloads.activeProgress {
+                ZStack {
+                    Image(systemName: "arrow.down")
+                        .font(.system(size: 10, weight: .bold))
+                    Circle()
+                        .stroke(Theme.sidebarText.opacity(0.25), lineWidth: 1.5)
                     Circle()
                         .trim(from: 0, to: progress)
                         .stroke(Color.accentColor, style: StrokeStyle(lineWidth: 1.5, lineCap: .round))
                         .rotationEffect(.degrees(-90))
                         .animation(.easeOut(duration: 0.2), value: progress)
                 }
+                .frame(width: 16, height: 16)
+            } else {
+                Image(systemName: "tray.and.arrow.down")
+                    .font(.system(size: 13, weight: .medium))
             }
-            .frame(width: 16, height: 16)
         }
         .buttonStyle(SidebarIconButtonStyle())
         .help("Downloads (⌘⇧J)")
@@ -45,12 +48,19 @@ private struct DownloadsBubble: View {
                 .padding(.horizontal, 14)
                 .padding(.top, 12)
                 .padding(.bottom, 6)
-            VStack(spacing: 0) {
-                ForEach(browser.downloads.downloads.prefix(5)) { download in
-                    DownloadRow(download: download)
+            if browser.downloads.downloads.isEmpty {
+                Text("No downloads yet")
+                    .foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 16)
+            } else {
+                VStack(spacing: 0) {
+                    ForEach(browser.downloads.downloads.prefix(5)) { download in
+                        DownloadRow(download: download)
+                    }
                 }
+                .padding(.horizontal, 4)
             }
-            .padding(.horizontal, 4)
             Divider()
                 .padding(.top, 4)
             Button("Show All Downloads", action: browser.showDownloads)

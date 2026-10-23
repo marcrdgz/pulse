@@ -1,34 +1,116 @@
 import AppKit
 import SwiftUI
 
-/// The bottom bar: one dot per space and a button to create a new one.
+/// The bottom bar, laid out like Arc's: downloads on the left, the spaces centered and the
+/// new-item menu on the right.
 struct SpaceSwitcher: View {
     @Environment(Browser.self) private var browser
     @Environment(SidebarDragController.self) private var dragController
 
     var body: some View {
-        HStack(spacing: 2) {
-            ForEach(Array(browser.spaces.enumerated()), id: \.element.id) { index, space in
-                SpaceDot(space: space, isActive: space.id == browser.activeSpaceID)
-                    .help(index < 9 ? "\(space.name) (⌃\(index + 1))" : space.name)
+        let draft = browser.spaceDraft
+        HStack(spacing: 0) {
+            // Equal widths on both ends keep the spaces centered in the sidebar.
+            Group {
+                if draft == nil { DownloadsButton() }
+            }
+            .frame(width: Self.edgeWidth, alignment: .leading)
+            Spacer(minLength: 0)
+            HStack(spacing: 2) {
+                ForEach(Array(browser.spaces.enumerated()), id: \.element.id) { index, space in
+                    SpaceDot(space: space, isActive: draft == nil && space.id == browser.activeSpaceID)
+                        .help(index < 9 ? "\(space.name) (⌃\(index + 1))" : space.name)
+                }
+                if let draft {
+                    SpaceIcon(space: draft, size: 10)
+                        .frame(width: 22, height: 22)
+                        .transition(.scale.combined(with: .opacity))
+                }
             }
             Spacer(minLength: 0)
-            if !browser.downloads.downloads.isEmpty {
-                DownloadsButton()
+            Group {
+                if draft == nil { NewItemButton() }
             }
-            Button { browser.createSpace() } label: {
-                Image(systemName: "plus")
-                    .font(.system(size: 12, weight: .semibold))
-            }
-            .buttonStyle(SidebarIconButtonStyle())
-            .help("New Space")
-            .accessibilityLabel("New Space")
+            .frame(width: Self.edgeWidth, alignment: .trailing)
         }
         .frame(height: 28)
         .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { frame in
             dragController.spaceSwitcherFrame = frame
         }
         .animation(.snappy(duration: 0.2), value: browser.activeSpaceID)
+        .animation(.snappy(duration: 0.2), value: draft == nil)
+    }
+
+    private static let edgeWidth: CGFloat = 28
+}
+
+/// Arc's "+" at the bottom right: a small menu of things to create, with the button turning into
+/// a close button while it's open.
+private struct NewItemButton: View {
+    @Environment(Browser.self) private var browser
+    @State private var isMenuPresented = false
+
+    var body: some View {
+        Button { isMenuPresented.toggle() } label: {
+            Image(systemName: isMenuPresented ? "xmark" : "plus")
+                .font(.system(size: 13, weight: .semibold))
+                .contentTransition(.symbolEffect(.replace))
+        }
+        .buttonStyle(SidebarIconButtonStyle())
+        .help("New…")
+        .accessibilityLabel("New")
+        .popover(isPresented: $isMenuPresented, arrowEdge: .top) {
+            VStack(spacing: 0) {
+                NewItemRow(title: "New Space", symbol: "plus.square.on.square") {
+                    isMenuPresented = false
+                    browser.beginCreatingSpace()
+                }
+                Divider()
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 6)
+                NewItemRow(title: "New Tab", symbol: "plus.square", shortcut: "⌘T") {
+                    isMenuPresented = false
+                    browser.showCommandBar(.newTab)
+                }
+            }
+            .padding(8)
+            .frame(width: 210)
+        }
+    }
+}
+
+private struct NewItemRow: View {
+    let title: String
+    let symbol: String
+    var shortcut: String?
+    let action: () -> Void
+    @State private var isHovered = false
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 12) {
+                Image(systemName: symbol)
+                    .font(.system(size: 16))
+                    .frame(width: 22)
+                Text(title)
+                    .font(.system(size: 13, weight: .medium))
+                Spacer(minLength: 0)
+                if let shortcut {
+                    Text(shortcut)
+                        .font(.system(size: 12))
+                        .foregroundStyle(.secondary)
+                }
+            }
+            .padding(.horizontal, 10)
+            .frame(height: 34)
+            .background(
+                RoundedRectangle(cornerRadius: Theme.rowCornerRadius, style: .continuous)
+                    .fill(Color.accentColor.opacity(isHovered ? 0.18 : 0))
+            )
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .onHover { isHovered = $0 }
     }
 }
 

@@ -191,7 +191,7 @@ extension Browser {
             if let tab, let space = spaces.first(where: { $0.id == spaceID }) { moveTab(tab, to: space) }
         case .switchToSpace(let spaceID):
             if let space = spaces.first(where: { $0.id == spaceID }) { selectSpace(space) }
-        case .newSpace: createSpace()
+        case .newSpace: beginCreatingSpace()
         case .toggleSidebar: toggleSidebar()
         case .reopenClosedTab: reopenClosedTab()
         case .showHistory: showHistory()

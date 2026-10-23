@@ -13,12 +13,17 @@ struct SidebarView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             SidebarToolbar()
-            SidebarAddressBar()
-            if !browser.favorites.isEmpty || dragController.showsDropZones {
-                FavoritesGrid()
-                    .transition(.move(edge: .top).combined(with: .opacity))
+            if let draft = browser.spaceDraft {
+                SpaceCreationForm(draft: draft)
+                    .transition(.opacity)
+            } else {
+                SidebarAddressBar()
+                if !browser.favorites.isEmpty || dragController.showsDropZones {
+                    FavoritesGrid()
+                        .transition(.move(edge: .top).combined(with: .opacity))
+                }
+                spacePager
             }
-            spacePager
             SpaceSwitcher()
         }
         .padding(.horizontal, 10)
@@ -27,6 +32,7 @@ struct SidebarView: View {
         .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { frame = $0 }
         .animation(.snappy(duration: 0.22), value: browser.favorites.isEmpty)
         .animation(.snappy(duration: 0.22), value: dragController.isDragging)
+        .animation(.snappy(duration: 0.22), value: browser.spaceDraft == nil)
         .onAppear(perform: installEventMonitors)
         .onDisappear(perform: removeEventMonitors)
     }

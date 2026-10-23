@@ -48,6 +48,8 @@ final class Browser: NSObject {
     private(set) var renamingSpaceID: Space.ID?
     /// The space whose icon picker is open in the sidebar.
     private(set) var editingIconSpaceID: Space.ID?
+    /// A space being set up in the sidebar's "Create a Space" form; not in `spaces` until committed.
+    private(set) var spaceDraft: Space?
     var isClearBrowsingDataPresented = false
     /// Shown on the very first launch, before any session exists.
     var isOnboardingPresented = false
@@ -679,11 +681,44 @@ final class Browser: NSObject {
         return space
     }
 
+    /// Shows Arc's "Create a Space" form in place of the sidebar.
+    func beginCreatingSpace() {
+        commandBar = nil
+        isSidebarExpanded = true
+        if spaceDraft == nil {
+            spaceDraft = Space(name: "", theme: nextSpaceTheme)
+        }
+    }
+
+    func cancelCreatingSpace() {
+        spaceDraft = nil
+    }
+
+    /// Adds the draft as a new space; does nothing while it has no name.
+    @discardableResult
+    func commitSpaceDraft() -> Space? {
+        guard let draft = spaceDraft else { return nil }
+        let name = draft.name.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !name.isEmpty else { return nil }
+        draft.name = name
+        spaceDraft = nil
+        spaces.append(draft)
+        selectSpace(draft)
+        commandBar = .newTab
+        return draft
+    }
+
+    /// The theme the sidebar is painted with, previewing the draft's while one is being created.
+    var sidebarTheme: SpaceTheme {
+        spaceDraft?.theme ?? activeSpace.theme
+    }
+
     private var nextSpaceTheme: SpaceTheme {
         SpaceTheme.allCases[spaces.count % SpaceTheme.allCases.count]
     }
 
     func selectSpace(_ space: Space) {
+        spaceDraft = nil
         guard space.id != activeSpaceID, spaces.contains(where: { $0.id == space.id }) else { return }
         let previous = activeTab
         previous?.wasShown(at: .now)

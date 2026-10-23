@@ -14,10 +14,10 @@ struct BrowserWindow: View {
     var body: some View {
         ZStack(alignment: .leading) {
             // Cross-fades between spaces' themes; gradients don't interpolate their colors.
-            Theme.sidebarGradient(browser.activeSpace.theme)
-                .id(browser.activeSpace.theme)
+            Theme.sidebarGradient(browser.sidebarTheme)
+                .id(browser.sidebarTheme)
                 .transition(.opacity)
-                .animation(.easeInOut(duration: 0.35), value: browser.activeSpace.theme)
+                .animation(.easeInOut(duration: 0.35), value: browser.sidebarTheme)
             WindowDragArea()
 
             HStack(spacing: 0) {
@@ -198,7 +198,7 @@ struct BrowserWindow: View {
         SidebarView()
             .environment(dragController)
             .frame(width: sidebarWidth)
-            .background(Theme.sidebarGradient(browser.activeSpace.theme))
+            .background(Theme.sidebarGradient(browser.sidebarTheme))
             .clipShape(RoundedRectangle(cornerRadius: Theme.contentCornerRadius, style: .continuous))
             .shadow(color: .black.opacity(0.25), radius: 12, x: 2)
             .padding(.vertical, Theme.contentInset)

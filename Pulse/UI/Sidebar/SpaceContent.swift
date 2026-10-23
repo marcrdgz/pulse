@@ -168,7 +168,7 @@ struct SpaceContextMenu: View {
         Divider()
         Button("Close Today Tabs") { browser.closeTodayTabs(in: space) }
             .disabled(space.todayTabs.isEmpty)
-        Button("New Space") { browser.createSpace() }
+        Button("New Space…", action: browser.beginCreatingSpace)
         Divider()
         Button("Delete Space…", action: confirmDelete)
             .disabled(browser.spaces.count < 2)

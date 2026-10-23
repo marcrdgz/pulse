@@ -153,4 +153,33 @@ struct SpacesTests {
         browser.rename(browser.activeSpace, to: "   ")
         #expect(browser.activeSpace.name == "Personal")
     }
+
+    @Test func spaceDraftIsAddedOnlyOnceNamed() {
+        let browser = Browser()
+        let home = browser.activeSpace
+        browser.beginCreatingSpace()
+        let draft = try! #require(browser.spaceDraft)
+        browser.setTheme(.green, for: draft)
+        #expect(browser.sidebarTheme == .green)
+        #expect(browser.spaces.count == 1)
+
+        draft.name = "   "
+        #expect(browser.commitSpaceDraft() == nil)
+        draft.name = " Work "
+        let work = browser.commitSpaceDraft()
+        #expect(work === draft)
+        #expect(work?.name == "Work")
+        #expect(browser.spaces.map(\.id) == [home.id, draft.id])
+        #expect(browser.activeSpace === draft)
+        #expect(browser.spaceDraft == nil)
+        #expect(browser.commandBar == .newTab)
+    }
+
+    @Test func switchingSpacesCancelsTheDraft() {
+        let browser = Browser()
+        browser.beginCreatingSpace()
+        browser.selectSpace(browser.activeSpace)
+        #expect(browser.spaceDraft == nil)
+        #expect(browser.spaces.count == 1)
+    }
 }

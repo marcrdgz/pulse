@@ -177,7 +177,7 @@ struct BrowserCommands: Commands {
         }
 
         CommandMenu("Spaces") {
-            Button("New Space") { browser.createSpace() }
+            Button("New Space…", action: browser.beginCreatingSpace)
             Divider()
             Button("Next Space") { browser.selectAdjacentSpace(offset: 1) }
                 .keyboardShortcut(.rightArrow, modifiers: [.command, .option])

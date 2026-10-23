@@ -5,6 +5,7 @@ A native macOS browser built on WebKit, with Arc's look and keyboard-first workf
 ## Features
 
 - Spaces: separate sidebars with their own color, pinned and "Today" tabs; Favorites (favicon grid) are shared.
+  Create one from the + menu at the bottom of the sidebar, picking its name, emoji and theme as in Arc.
 - Switch spaces with ⌃1…⌃9, ⌘⌥← / ⌘⌥→, the dots at the bottom of the sidebar, or a two-finger swipe.
 - Command bar (⌘T / ⌘L) that behaves like Chrome's address bar: inline completion of sites you
   type or visit often, history ranked by frequency and recency, open tabs and Google suggestions.
