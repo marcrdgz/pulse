@@ -43,12 +43,22 @@ struct TabRow: View {
                 .help(tab.isMuted ? "Unmute Tab" : "Mute Tab")
             }
             if isHovered, !isRenaming {
-                Button { browser.close(tab) } label: {
-                    Image(systemName: "xmark")
-                        .font(.system(size: 10, weight: .bold))
+                // Like Arc, a pinned tab's hover button unpins it to today instead of resetting it.
+                if tab.isPinned {
+                    Button { browser.togglePin(tab) } label: {
+                        Image(systemName: "minus")
+                            .font(.system(size: 10, weight: .bold))
+                    }
+                    .buttonStyle(SidebarIconButtonStyle())
+                    .help("Unpin Tab")
+                } else {
+                    Button { browser.close(tab) } label: {
+                        Image(systemName: "xmark")
+                            .font(.system(size: 10, weight: .bold))
+                    }
+                    .buttonStyle(SidebarIconButtonStyle())
+                    .help("Close Tab (⌘W)")
                 }
-                .buttonStyle(SidebarIconButtonStyle())
-                .help("Close Tab (⌘W)")
             }
         }
         .font(.system(size: 13, weight: isActive ? .medium : .regular))
@@ -61,13 +71,14 @@ struct TabRow: View {
         .onTapGesture { browser.select(tab) }
         .simultaneousGesture(TapGesture(count: 2).onEnded(startRenaming))
         .contextMenu { TabContextMenu(tab: tab, onRename: startRenaming) }
-        // Read as one button, with the hover-only close button as an action; the rename field stays reachable.
+        // Read as one button, with the hover-only close and unpin buttons as actions; the rename field stays reachable.
         .accessibilityElement(children: isRenaming ? .contain : .ignore)
         .accessibilityLabel(tab.displayTitle)
         .accessibilityValue(tab.mediaDescription ?? "")
         .accessibilityAddTraits(isActive ? [.isButton, .isSelected] : .isButton)
         .accessibilityAction { browser.select(tab) }
         .accessibilityAction(named: tab.isPinned ? "Reset Pinned Tab" : "Close Tab") { browser.close(tab) }
+        .accessibilityAction(named: tab.isPinned ? "Unpin Tab" : "Pin Tab") { browser.togglePin(tab) }
         .accessibilityAction(named: "Rename Tab", startRenaming)
         .accessibilityAction(named: tab.isMuted ? "Unmute Tab" : "Mute Tab", tab.toggleMuted)
         .sidebarDraggable(tab)
