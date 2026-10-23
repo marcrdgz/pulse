@@ -63,7 +63,12 @@ final class Browser: NSObject {
     @ObservationIgnored let websiteDataStore: WKWebsiteDataStore
     @ObservationIgnored let faviconLoader: FaviconLoader
     /// The window showing this browser, so event monitors only act on their own window's events.
-    @ObservationIgnored weak var window: NSWindow?
+    @ObservationIgnored weak var window: NSWindow? {
+        didSet { if let window { Self.browsersByWindow.setObject(self, forKey: window) } }
+    }
+    /// Lets menu commands find the key window's browser: SwiftUI's focused values go nil
+    /// while an AppKit view such as the web view is first responder.
+    @ObservationIgnored private static let browsersByWindow = NSMapTable<NSWindow, Browser>.weakToWeakObjects()
     @ObservationIgnored let preferences: Preferences
     @ObservationIgnored let history: HistoryStore?
     @ObservationIgnored private let sessionStore: SessionStore?
@@ -120,6 +125,11 @@ final class Browser: NSObject {
     }
 
     /// A private window's browser: nothing it does is written to disk, except downloads.
+    /// The browser shown in `window`, if it is a browser window.
+    static func showing(_ window: NSWindow) -> Browser? {
+        browsersByWindow.object(forKey: window)
+    }
+
     static func makePrivate(contentBlocker: ContentBlocker, preferences: Preferences) -> Browser {
         Browser(
             downloads: DownloadManager(preferences: preferences),
