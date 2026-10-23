@@ -49,10 +49,19 @@ struct SidebarView: View {
                 }
             }
             .frame(width: proxy.size.width * CGFloat(browser.spaces.count), alignment: .leading)
-            .offset(x: -proxy.size.width * CGFloat(browser.activeSpaceIndex))
+            .offset(x: -proxy.size.width * CGFloat(browser.activeSpaceIndex) + dragOffset)
             .animation(reduceMotion ? nil : .snappy(duration: 0.3), value: browser.activeSpaceID)
         }
         .clipped()
+    }
+
+    /// The swipe in progress, resisting past the first and last space since switching doesn't wrap.
+    private var dragOffset: CGFloat {
+        guard !reduceMotion else { return 0 }
+        let offset = swipeTracker.dragOffset
+        let index = browser.activeSpaceIndex
+        let hasNeighbor = offset < 0 ? index < browser.spaces.count - 1 : index > 0
+        return hasNeighbor ? offset : offset / 4
     }
 
     /// Events SwiftUI has no gestures for: middle-click closes the tab under the pointer,
@@ -67,11 +76,16 @@ struct SidebarView: View {
             return nil
         }
         let swipe = NSEvent.addLocalMonitorForEvents(matching: .scrollWheel) { event in
-            guard let point = windowPoint(of: event), frame.contains(point) else { return event }
-            if let offset = swipeTracker.offset(for: event) {
-                browser.selectAdjacentSpace(offset: offset)
+            // A swipe that drifts off the sidebar still has to end, or the spaces would stay mid-drag.
+            guard let point = windowPoint(of: event), frame.contains(point) || swipeTracker.consumes(event)
+            else { return event }
+            if let offset = swipeTracker.track(event, pageWidth: frame.width) {
+                withAnimation(reduceMotion ? nil : .snappy(duration: 0.3)) {
+                    browser.selectAdjacentSpace(offset: offset)
+                    swipeTracker.settle()
+                }
             }
-            return swipeTracker.isConsumingGesture ? nil : event
+            return swipeTracker.consumes(event) ? nil : event
         }
         eventMonitors = [middleClick, swipe].compactMap { $0 }
     }

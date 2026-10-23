@@ -213,33 +213,67 @@ struct SpaceIcon: View {
     }
 }
 
-/// Turns a horizontal two-finger swipe over the sidebar into one space switch per gesture.
+/// Turns a horizontal two-finger swipe over the sidebar into a drag of the spaces that follows
+/// the fingers, settling on a space when they lift, like Arc.
+@Observable
 final class SpaceSwipeTracker {
-    private var horizontal: CGFloat = 0
-    private var vertical: CGFloat = 0
-    private var didSwitch = false
+    /// How far the fingers have dragged the spaces sideways; negative reveals the space to the right.
+    private var translation: CGFloat = 0
+    @ObservationIgnored private var vertical: CGFloat = 0
+    @ObservationIgnored private var isHorizontal: Bool?
+    /// Points per second of the latest movement, so a quick flick switches without a long drag.
+    @ObservationIgnored private var velocity: CGFloat = 0
+    @ObservationIgnored private var lastTimestamp: TimeInterval = 0
 
-    /// Returns the space offset to move by, or `nil` while the gesture isn't a clear horizontal swipe.
-    func offset(for event: NSEvent) -> Int? {
+    /// Returns the space offset to settle on (0 to snap back) when a horizontal swipe ends, otherwise `nil`.
+    func track(_ event: NSEvent, pageWidth: CGFloat) -> Int? {
         guard event.hasPreciseScrollingDeltas else { return nil }
         switch event.phase {
-        case .began:
-            horizontal = 0
+        case .mayBegin, .began:
+            translation = 0
             vertical = 0
-            didSwitch = false
-            return nil
+            velocity = 0
+            isHorizontal = nil
         case .changed:
-            horizontal += event.scrollingDeltaX
             vertical += event.scrollingDeltaY
-            guard !didSwitch, abs(horizontal) > 40, abs(horizontal) > abs(vertical) * 2 else { return nil }
-            didSwitch = true
+            let horizontal = translation + event.scrollingDeltaX
+            if isHorizontal == nil {
+                // Decide early so the drag starts with the fingers, but leave vertical scrolling alone.
+                if abs(horizontal) > 6, abs(horizontal) > abs(vertical) * 2 {
+                    isHorizontal = true
+                } else if abs(vertical) > 6 {
+                    isHorizontal = false
+                }
+            }
+            if event.timestamp > lastTimestamp {
+                velocity = event.scrollingDeltaX / (event.timestamp - lastTimestamp)
+            }
+            lastTimestamp = event.timestamp
+            translation = min(max(horizontal, -pageWidth), pageWidth)
+        case .ended, .cancelled:
+            guard isHorizontal == true else { return nil }
+            let isFlick = abs(translation) > 10 && abs(velocity) > 500 && (velocity < 0) == (translation < 0)
+            guard event.phase == .ended, abs(translation) > pageWidth / 3 || isFlick else { return 0 }
             // Fingers moving left reveal the space to the right, as in Arc.
-            return horizontal < 0 ? 1 : -1
+            return translation < 0 ? 1 : -1
         default:
-            return nil
+            break
         }
+        return nil
     }
 
-    /// Whether the current gesture already switched spaces, so the rest of it should be swallowed.
-    var isConsumingGesture: Bool { didSwitch }
+    /// Clears the drag once the spaces have been told where to settle, so both animate together.
+    func settle() {
+        translation = 0
+    }
+
+    /// The rest of a horizontal swipe, momentum included, belongs to the spaces, not the scroll view under it.
+    func consumes(_ event: NSEvent) -> Bool {
+        isHorizontal == true && event.hasPreciseScrollingDeltas && !(event.phase.isEmpty && event.momentumPhase.isEmpty)
+    }
+
+    /// The drag to show; empty until the gesture is known to be a horizontal swipe.
+    var dragOffset: CGFloat {
+        isHorizontal == true ? translation : 0
+    }
 }
