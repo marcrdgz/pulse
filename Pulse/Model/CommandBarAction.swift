@@ -10,6 +10,7 @@ struct CommandBarAction: Identifiable {
         case closeTab
         case closeOtherTabs
         case reload
+        case toggleMuted
         case findOnPage
         case toggleContentBlocking
         case moveTab(to: Space.ID)
@@ -65,6 +66,15 @@ extension Browser {
                 Action(kind: .reload, title: "Reload Page", symbol: "arrow.clockwise", keywords: ["refresh"], shortcut: "⌘R"),
                 Action(kind: .findOnPage, title: "Find on Page", symbol: "text.magnifyingglass", keywords: ["text"], shortcut: "⌘F"),
             ]
+            if tab.isPlayingAudio || tab.isMuted {
+                actions.append(Action(
+                    kind: .toggleMuted,
+                    title: tab.isMuted ? "Unmute Tab" : "Mute Tab",
+                    symbol: tab.isMuted ? "speaker.wave.2" : "speaker.slash",
+                    keywords: ["sound", "audio", "silence"],
+                    shortcut: "⌃M"
+                ))
+            }
             if contentBlocker.isEnabled, tab.url.isWebPage, let site = tab.url.displayHost {
                 let isBlocking = contentBlocker.isBlocking(on: tab.url)
                 actions.append(Action(
@@ -152,6 +162,7 @@ extension Browser {
         case .closeTab: closeActiveTab()
         case .closeOtherTabs: if let tab { closeOtherTabs(than: tab) }
         case .reload: tab?.reload()
+        case .toggleMuted: tab?.toggleMuted()
         case .findOnPage: showFindBar()
         case .toggleContentBlocking: if let tab { toggleContentBlocking(on: tab) }
         case .moveTab(let spaceID):

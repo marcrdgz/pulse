@@ -25,8 +25,9 @@ A native macOS browser built on WebKit, with Arc's look and keyboard-first workf
 - Links to other apps (`mailto:`, `zoommtg:`…) open in that app, asking first unless clicked; sign-in
   prompts for HTTP Basic/Digest auth and JavaScript `prompt()` dialogs.
 - Closing a popup or a link opened in a new tab returns to the page that opened it.
-- Hovering a link previews its URL in the page's corner; tabs show a spinner while loading and a
-  red camera or microphone while a site uses them.
+- Hovering a link previews its URL in the page's corner; tabs show a spinner while loading, a
+  red camera or microphone while a site uses them, and a speaker while they play audio: click it
+  (or ⌃M) to mute the tab, which stays muted through reloads and sleep.
 - VoiceOver labels for sidebar controls, and fades instead of slides with Reduce Motion on.
 - Downloads like Chrome's: a bubble with progress, pause/resume, cancel and retry, and a ⌘⇧J page
   that remembers past downloads.
@@ -56,6 +57,7 @@ A native macOS browser built on WebKit, with Arc's look and keyboard-first workf
 | ⌘[ / ⌘] | Back / forward |
 | ⌘R / ⌘⇧R | Reload / reload ignoring cache |
 | ⌘⇧C | Copy URL |
+| ⌃M | Mute / unmute tab |
 | ⌘F / ⌘G / ⌘⇧G | Find on page / next / previous match |
 | ⌘+ / ⌘- / ⌘0 | Zoom |
 | ⌘⌥I | Web Inspector |

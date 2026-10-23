@@ -141,6 +141,9 @@ struct BrowserCommands: Commands {
             }
             .keyboardShortcut("c", modifiers: [.command, .shift])
             .disabled(activeTab == nil)
+            Button(activeTab?.isMuted == true ? "Unmute Tab" : "Mute Tab") { activeTab?.toggleMuted() }
+                .keyboardShortcut("m", modifiers: .control)
+                .disabled(activeTab == nil)
 
             Divider()
             Button("Next Tab") { browser.selectAdjacentTab(offset: 1) }

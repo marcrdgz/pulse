@@ -19,6 +19,10 @@ final class Tab: Identifiable {
     private(set) var microphoneCaptureState: WKMediaCaptureState = .none
     /// Asleep to free memory; showing the tab brings the page back where it was.
     private(set) var isHibernated = false
+    /// The page is making sound (or would be, if muted).
+    private(set) var isPlayingAudio = false
+    /// Silences the page, even across sleeping and reloads, until unmuted.
+    private(set) var isMuted = false
     /// The page a pinned tab returns to when closed; `nil` for today tabs.
     var pinnedURL: URL?
     /// Set by the user from the sidebar; overrides the page title.
@@ -31,6 +35,7 @@ final class Tab: Identifiable {
     @ObservationIgnored private var coordinator: WebViewCoordinator?
     @ObservationIgnored private var observations: [NSKeyValueObservation] = []
     @ObservationIgnored private var appliedRuleListIDs: [String] = []
+    @ObservationIgnored private var audioObservation: NSObject?
     /// The back/forward list and scroll position saved when the tab went to sleep.
     @ObservationIgnored private var hibernatedState: Any?
     /// Pages opened by script keep a live `window.opener` (sign-in popups), which a reload would cut.
@@ -57,14 +62,21 @@ final class Tab: Identifiable {
 
     var internalPage: InternalPage? { InternalPage(url: url) }
 
-    /// e.g. "Using camera and microphone"; `nil` while the page captures nothing.
-    var mediaCaptureDescription: String? {
+    /// e.g. "Using camera and microphone" or "Muted"; `nil` while the page captures and plays nothing.
+    var mediaDescription: String? {
         let devices = [(cameraCaptureState, "camera"), (microphoneCaptureState, "microphone")]
         let active = devices.filter { $0.0 == .active }.map(\.1)
         let muted = devices.filter { $0.0 == .muted }.map(\.1)
         if !active.isEmpty { return "Using " + active.joined(separator: " and ") }
         if !muted.isEmpty { return "Paused " + muted.joined(separator: " and ") }
+        if isMuted { return "Muted" }
+        if isPlayingAudio { return "Playing audio" }
         return nil
+    }
+
+    func toggleMuted() {
+        isMuted.toggle()
+        if let loadedWebView { PageAudio.setMuted(isMuted, in: loadedWebView) }
     }
 
     var displayTitle: String {
@@ -219,6 +231,8 @@ final class Tab: Identifiable {
     /// Drops the web view (and its process memory); the tab reloads lazily when shown again.
     func unload() {
         observations.removeAll()
+        audioObservation = nil
+        isPlayingAudio = false
         appliedRuleListIDs = []
         hibernatedState = nil
         isHibernated = false
@@ -269,6 +283,8 @@ final class Tab: Identifiable {
         self.coordinator = coordinator
         loadedWebView = webView
         applyContentRules(forPageAt: url)
+        if isMuted { PageAudio.setMuted(true, in: webView) }
+        audioObservation = PageAudio.observe(webView) { [weak self] isPlaying in self?.isPlayingAudio = isPlaying }
 
         observations = [
             webView.observe(\.url) { [weak self] _, _ in MainActor.assumeIsolated { self?.syncWithWebView() } },

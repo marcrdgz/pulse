@@ -19,7 +19,7 @@ struct FavoritesGrid: View {
                             .onTapGesture { browser.select(tab) }
                             .accessibilityElement(children: .ignore)
                             .accessibilityLabel(tab.displayTitle)
-                            .accessibilityValue(tab.mediaCaptureDescription ?? "")
+                            .accessibilityValue(tab.mediaDescription ?? "")
                             .accessibilityAddTraits(tab.id == browser.activeTabID ? [.isButton, .isSelected] : .isButton)
                             .accessibilityAction { browser.select(tab) }
                             .contextMenu { TabContextMenu(tab: tab) }

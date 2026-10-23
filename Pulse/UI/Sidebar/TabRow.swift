@@ -31,8 +31,17 @@ struct TabRow: View {
                     .truncationMode(.tail)
             }
             Spacer(minLength: 4)
-            MediaCaptureIndicator(tab: tab)
+            MediaCaptureIndicator(tab: tab, showsAudio: false)
                 .font(.system(size: 10, weight: .semibold))
+            if tab.isPlayingAudio || tab.isMuted {
+                Button(action: tab.toggleMuted) {
+                    Image(systemName: tab.isMuted ? "speaker.slash.fill" : "speaker.wave.2.fill")
+                        .font(.system(size: 10, weight: .semibold))
+                        .opacity(tab.isMuted ? 0.6 : 1)
+                }
+                .buttonStyle(SidebarIconButtonStyle())
+                .help(tab.isMuted ? "Unmute Tab" : "Mute Tab")
+            }
             if isHovered, !isRenaming {
                 Button { browser.close(tab) } label: {
                     Image(systemName: "xmark")
@@ -55,11 +64,12 @@ struct TabRow: View {
         // Read as one button, with the hover-only close button as an action; the rename field stays reachable.
         .accessibilityElement(children: isRenaming ? .contain : .ignore)
         .accessibilityLabel(tab.displayTitle)
-        .accessibilityValue(tab.mediaCaptureDescription ?? "")
+        .accessibilityValue(tab.mediaDescription ?? "")
         .accessibilityAddTraits(isActive ? [.isButton, .isSelected] : .isButton)
         .accessibilityAction { browser.select(tab) }
         .accessibilityAction(named: tab.isPinned ? "Reset Pinned Tab" : "Close Tab") { browser.close(tab) }
         .accessibilityAction(named: "Rename Tab", startRenaming)
+        .accessibilityAction(named: tab.isMuted ? "Unmute Tab" : "Mute Tab", tab.toggleMuted)
         .sidebarDraggable(tab)
     }
 
@@ -113,6 +123,9 @@ struct TabContextMenu: View {
         Button("Copy URL") { browser.copyURL(of: tab) }
         ShareLink(item: tab.url)
         Button("Duplicate Tab") { browser.duplicate(tab) }
+        if tab.isPlayingAudio || tab.isMuted {
+            Button(tab.isMuted ? "Unmute Tab" : "Mute Tab", action: tab.toggleMuted)
+        }
         Divider()
         Button(tab.isPinned ? "Reset Pinned Tab" : "Close Tab") { browser.close(tab) }
         if section == .today, let space = browser.space(containing: tab) {
@@ -155,15 +168,22 @@ struct FaviconView: View {
     }
 }
 
-/// A red camera or microphone while a page is capturing, grey and slashed while the page muted it.
+/// A red camera or microphone while a page is capturing, grey and slashed while the page muted it;
+/// otherwise a speaker while it plays audio, for tiles too small for the row's mute button.
 struct MediaCaptureIndicator: View {
     let tab: Tab
+    var showsAudio = true
 
     var body: some View {
         if let symbol {
             Image(systemName: symbol)
                 .foregroundStyle(isActive ? AnyShapeStyle(.red) : AnyShapeStyle(.secondary))
-                .help(tab.mediaCaptureDescription ?? "")
+                .help(tab.mediaDescription ?? "")
+                .accessibilityHidden(true)
+        } else if showsAudio, tab.isPlayingAudio || tab.isMuted {
+            Image(systemName: tab.isMuted ? "speaker.slash.fill" : "speaker.wave.2.fill")
+                .foregroundStyle(.secondary)
+                .help(tab.mediaDescription ?? "")
                 .accessibilityHidden(true)
         }
     }

@@ -96,7 +96,7 @@ private struct RailTab: View {
             .contextMenu { TabContextMenu(tab: tab) }
             .accessibilityElement(children: .ignore)
             .accessibilityLabel(tab.displayTitle)
-            .accessibilityValue(tab.mediaCaptureDescription ?? "")
+            .accessibilityValue(tab.mediaDescription ?? "")
             .accessibilityAddTraits(isActive ? [.isButton, .isSelected] : .isButton)
             .accessibilityAction { browser.select(tab) }
             .accessibilityAction(named: tab.isPinned ? "Reset Pinned Tab" : "Close Tab") { browser.close(tab) }
