@@ -25,13 +25,11 @@ struct SidebarAddressBar: View {
                         .opacity(0.5)
                         .help("Ads and trackers are allowed on this site")
                 }
-                if tab?.url.isWebPage == true {
-                    // Room for the site controls button, which sits over the pill rather than inside it.
-                    Color.clear.frame(width: 18)
-                }
             }
             .font(.system(size: 13))
-            .padding(.horizontal, 10)
+            .padding(.leading, 10)
+            // Room for the site controls button, which sits over the pill rather than inside it.
+            .padding(.trailing, tab?.url.isWebPage == true ? 30 : 10)
             .frame(maxWidth: .infinity, minHeight: 32)
             .background(
                 RoundedRectangle(cornerRadius: Theme.rowCornerRadius, style: .continuous)
