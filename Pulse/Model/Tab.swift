@@ -356,6 +356,7 @@ final class Tab: NSObject, Identifiable {
         configuration.applicationNameForUserAgent = "Version/26.0 Safari/605.1.15"
         configuration.preferences.isElementFullscreenEnabled = true
         LinkHover.install(in: configuration.userContentController)
+        ScreenShareQuality.install(in: configuration.userContentController)
         if extensions != nil { ChromeWebStorePage.install(in: configuration.userContentController) }
         return configuration
     }
