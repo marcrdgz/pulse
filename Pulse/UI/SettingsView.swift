@@ -62,7 +62,7 @@ private struct GeneralSettings: View {
                     .foregroundStyle(.secondary)
             }
         }
-        .formStyle(.grouped)
+        .settingsPane()
         .onAppear { isDefaultBrowser = DefaultBrowser.isDefault }
     }
 }
@@ -84,7 +84,7 @@ private struct SearchSettings: View {
                     .foregroundStyle(.secondary)
             }
         }
-        .formStyle(.grouped)
+        .settingsPane()
     }
 }
 
@@ -106,7 +106,7 @@ private struct DownloadSettings: View {
                 Toggle("Ask where to save each file before downloading", isOn: $preferences.asksWhereToSaveDownloads)
             }
         }
-        .formStyle(.grouped)
+        .settingsPane()
     }
 }
 
@@ -153,7 +153,7 @@ private struct ExtensionSettings: View {
                 }
             }
         }
-        .formStyle(.grouped)
+        .settingsPane()
     }
 }
 
@@ -208,7 +208,7 @@ private struct PrivacySettings: View {
                 }
             }
         }
-        .formStyle(.grouped)
+        .settingsPane()
         .onAppear(perform: reload)
     }
 
@@ -238,5 +238,14 @@ private struct PrivacySettings: View {
             browser.sitePermissions?.setDecision(nil, for: origin, kind: kind)
         }
         reload()
+    }
+}
+
+private extension View {
+    /// Sizes the window to the pane like System Settings, scrolling only once a list outgrows the cap.
+    func settingsPane() -> some View {
+        formStyle(.grouped)
+            .frame(maxHeight: 640)
+            .fixedSize(horizontal: false, vertical: true)
     }
 }
