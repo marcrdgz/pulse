@@ -39,6 +39,7 @@ final class WebViewCoordinator: NSObject, WKNavigationDelegate, WKUIDelegate {
         }
         if navigationAction.targetFrame?.isMainFrame == true, let url = navigationAction.request.url {
             tab?.applyContentRules(forPageAt: url)
+            tab?.applyUserAgent(forPageAt: url)
         }
         decisionHandler(.allow)
     }

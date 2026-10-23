@@ -230,6 +230,13 @@ final class Tab: NSObject, Identifiable {
         appliedRuleListIDs = identifiers
     }
 
+    /// Called before each main-frame navigation, like `applyContentRules`.
+    func applyUserAgent(forPageAt pageURL: URL) {
+        guard let loadedWebView, browser?.extensions != nil else { return }
+        let userAgent = ChromeWebStorePage.userAgent(forPageAt: pageURL)
+        if loadedWebView.customUserAgent != userAgent { loadedWebView.customUserAgent = userAgent }
+    }
+
     /// Drops the web view (and its process memory); the tab reloads lazily when shown again.
     func unload() {
         observations.removeAll()
@@ -349,6 +356,7 @@ final class Tab: NSObject, Identifiable {
         configuration.applicationNameForUserAgent = "Version/26.0 Safari/605.1.15"
         configuration.preferences.isElementFullscreenEnabled = true
         LinkHover.install(in: configuration.userContentController)
+        if extensions != nil { ChromeWebStorePage.install(in: configuration.userContentController) }
         return configuration
     }
 }

@@ -26,6 +26,10 @@ final class WebExtensions: NSObject {
     @ObservationIgnored private weak var browser: Browser?
     /// The button the next action popup points at.
     @ObservationIgnored private weak var popupAnchor: NSView?
+    /// Chrome's "Add “Name”?" dialog; tests answer for the user.
+    @ObservationIgnored var confirmInstall: @MainActor (WKWebExtension) async -> Bool = WebExtensions.askToInstall
+    /// Asks before a page (the Chrome Web Store) removes an extension.
+    @ObservationIgnored var confirmRemoval: @MainActor (WKWebExtensionContext) async -> Bool = WebExtensions.askToRemove
 
     /// WebKit doesn't persist what the user granted, so it's kept per extension identifier.
     private enum Key {
@@ -63,6 +67,10 @@ final class WebExtensions: NSObject {
         }
     }
 
+    func context(identifiedBy identifier: String) -> WKWebExtensionContext? {
+        contexts.first { $0.uniqueIdentifier == identifier }
+    }
+
     /// The configuration a web view needs to show an extension's own pages, such as its options.
     func webViewConfiguration(forPageAt url: URL) -> WKWebViewConfiguration? {
         controller.extensionContext(for: url)?.webViewConfiguration
@@ -92,7 +100,7 @@ final class WebExtensions: NSObject {
         }
         guard await confirm(candidate) else { return nil }
 
-        if let installed = contexts.first(where: { $0.uniqueIdentifier == identifier }) {
+        if let installed = context(identifiedBy: identifier) {
             try? controller.unload(installed)
             contexts.removeAll { $0 === installed }
         }
@@ -104,24 +112,29 @@ final class WebExtensions: NSObject {
     }
 
     /// Installs with Chrome's confirmation dialog, reporting the result to the user.
-    func install(_ source: Source) async {
+    /// Returns whether the extension was installed.
+    @discardableResult
+    func install(_ source: Source) async -> Bool {
         do {
             let context: WKWebExtensionContext?
             switch source {
             case .file(let url):
-                context = try await install(from: url, confirm: Self.askToInstall)
+                context = try await install(from: url, confirm: confirmInstall)
             case .chromeWebStore(let id):
                 let (package, response) = try await URLSession.shared.download(from: ChromeWebStore.packageURL(forExtension: id))
                 defer { try? FileManager.default.removeItem(at: package) }
                 guard (response as? HTTPURLResponse)?.statusCode == 200 else { throw URLError(.badServerResponse) }
-                context = try await install(from: package, identifier: id, confirm: Self.askToInstall)
+                context = try await install(from: package, identifier: id, confirm: confirmInstall)
             }
-            if let context { browser?.showToast("Added \(context.webExtension.displayName ?? "Extension")") }
+            guard let context else { return false }
+            browser?.showToast("Added \(context.webExtension.displayName ?? "Extension")")
+            return true
         } catch {
             let alert = NSAlert()
             alert.messageText = "Couldn't add the extension"
             alert.informativeText = error.localizedDescription
             alert.runModal()
+            return false
         }
     }
 
@@ -204,6 +217,15 @@ final class WebExtensions: NSObject {
             : "It can:\n" + abilities.map { "• " + $0 }.joined(separator: "\n")
         alert.icon = webExtension.icon(for: CGSize(width: 64, height: 64))
         alert.addButton(withTitle: "Add Extension")
+        alert.addButton(withTitle: "Cancel")
+        return alert.runModal() == .alertFirstButtonReturn
+    }
+
+    private static func askToRemove(_ context: WKWebExtensionContext) async -> Bool {
+        let alert = NSAlert()
+        alert.messageText = "Remove “\(context.webExtension.displayName ?? "Extension")”?"
+        alert.icon = context.webExtension.icon(for: CGSize(width: 64, height: 64))
+        alert.addButton(withTitle: "Remove")
         alert.addButton(withTitle: "Cancel")
         return alert.runModal() == .alertFirstButtonReturn
     }
