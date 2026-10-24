@@ -68,10 +68,7 @@ final class WebViewCoordinator: NSObject, WKNavigationDelegate, WKUIDelegate {
         decidePolicyFor navigationResponse: WKNavigationResponse,
         decisionHandler: @escaping @MainActor @Sendable (WKNavigationResponsePolicy) -> Void
     ) {
-        guard navigationResponse.isForMainFrame else {
-            decisionHandler(.allow)
-            return
-        }
+        // Subframes count too: download pages often start the file from a hidden iframe.
         let isAttachment = (navigationResponse.response as? HTTPURLResponse)?
             .value(forHTTPHeaderField: "Content-Disposition")?
             .lowercased().hasPrefix("attachment") ?? false
