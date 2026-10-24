@@ -9,9 +9,16 @@ struct WebView: NSViewRepresentable {
 
     final class Coordinator {
         var hadFocus = false
+        /// The web view this container last showed, to tell a page another container took from one never shown.
+        weak var shownWebView: WKWebView?
     }
 
     func makeCoordinator() -> Coordinator { Coordinator() }
+
+    /// Lets go of the page, so a container that gave it up can tell it's free to show again.
+    static func dismantleNSView(_ container: NSView, coordinator: Coordinator) {
+        container.subviews.forEach { $0.removeFromSuperview() }
+    }
 
     func makeNSView(context: Context) -> NSView {
         let container = NSView()
@@ -25,7 +32,12 @@ struct WebView: NSViewRepresentable {
     func updateNSView(_ container: NSView, context: Context) {
         let webView = tab.webView
         let isNewlyShown = webView.superview !== container
+        // A container still on screen while it animates out, like Peek's card after "Open as Tab",
+        // must not take the page back from the pane that took it, or the pane goes blank. The pane
+        // may not be in the window yet, so a page with any superview counts as taken.
+        if isNewlyShown, webView === context.coordinator.shownWebView, webView.superview != nil { return }
         if isNewlyShown {
+            context.coordinator.shownWebView = webView
             container.subviews.forEach { $0.removeFromSuperview() }
             webView.frame = container.bounds
             webView.autoresizingMask = [.width, .height]
