@@ -40,6 +40,8 @@ final class HistoryStore {
         self.connection = connection
         execute("PRAGMA foreign_keys = ON")
         execute("PRAGMA journal_mode = WAL")
+        // With WAL this still survives app crashes; only a power loss can drop the last visits.
+        execute("PRAGMA synchronous = NORMAL")
         execute("""
             CREATE TABLE IF NOT EXISTS urls (
                 id INTEGER PRIMARY KEY,
@@ -70,6 +72,9 @@ final class HistoryStore {
     // MARK: Recording
 
     func recordVisit(url: URL, title: String, at date: Date = .now) {
+        // One commit per visit rather than per statement: this runs on the main thread on every navigation.
+        execute("BEGIN")
+        defer { execute("COMMIT") }
         execute(
             "INSERT INTO urls (url, title, last_visit) VALUES (?, ?, 0) ON CONFLICT(url) DO NOTHING",
             [.text(url.absoluteString), .text(title)]
