@@ -1,6 +1,6 @@
 import AppKit
 
-/// Fetches and caches favicons per host.
+/// Fetches and caches favicons per origin.
 final class FaviconLoader {
     /// Cached on disk, which Clear Browsing Data empties along with history.
     static let shared = FaviconLoader(session: URLSession(configuration: .cookieless(cache: .shared)))
@@ -18,15 +18,17 @@ final class FaviconLoader {
         """
 
     private let session: URLSession
-    private var iconsByHost: [String: NSImage] = [:]
+    private var iconsByOrigin: [String: NSImage] = [:]
 
     init(session: URLSession) {
         self.session = session
     }
 
     func favicon(forPage pageURL: URL, declaredIconURL: URL?) async -> NSImage? {
-        guard let host = pageURL.host() else { return nil }
-        if let icon = iconsByHost[host] { return icon }
+        // Keyed by origin rather than host: apps on different localhost ports are different sites.
+        guard let scheme = pageURL.scheme, let host = pageURL.host() else { return nil }
+        let origin = pageURL.port.map { "\(scheme)://\(host):\($0)" } ?? "\(scheme)://\(host)"
+        if let icon = iconsByOrigin[origin] { return icon }
 
         let candidates = [declaredIconURL, URL(string: "/favicon.ico", relativeTo: pageURL)?.absoluteURL]
         for case let iconURL? in candidates {
@@ -34,7 +36,7 @@ final class FaviconLoader {
                   data.count <= Self.maximumIconSize,
                   let icon = NSImage(data: data), icon.isValid
             else { continue }
-            iconsByHost[host] = icon
+            iconsByOrigin[origin] = icon
             return icon
         }
         return nil
