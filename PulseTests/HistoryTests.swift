@@ -30,6 +30,17 @@ struct HistoryStoreTests {
         #expect(history.visits(matching: "swift apple").isEmpty)
     }
 
+    @Test func addressesTypedOftenStayCandidatesAmongNewerPages() {
+        history.recordVisit(url: github, title: "Apple", at: now.addingTimeInterval(-10 * 86_400))
+        (0..<5).forEach { _ in history.recordTyped(github) }
+        for page in 0..<3 {
+            history.recordVisit(url: URL(string: "https://example.com/\(page)")!, title: "", at: now)
+        }
+
+        #expect(history.entries(matching: "", limit: 3, now: now).map(\.url).contains(github) == false)
+        #expect(history.entries(matching: "m", limit: 3, now: now).first?.url == github)
+    }
+
     @Test func updatesTitlesAndCountsTypedAddresses() {
         history.recordVisit(url: swift, title: "", at: now)
         history.updateTitle("Swift.org", for: swift)

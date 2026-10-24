@@ -163,16 +163,28 @@ final class HistoryStore {
         }.compactMap { $0 }
     }
 
-    /// Visited URLs matching every term, most recent first; ranking is up to the caller.
-    func entries(matching text: String, limit: Int = 200) -> [HistoryEntry] {
+    /// Visited URLs matching every term: the most recent first without terms, otherwise the most
+    /// used first, so a short input keeps addresses typed often among the candidates the caller ranks.
+    func entries(matching text: String, limit: Int = 200, now: Date = .now) -> [HistoryEntry] {
         let (condition, bindings) = termsCondition(text)
+        // `Omnibox.score` without the match bonus: typed and visit counts, faded by age.
+        let order = bindings.isEmpty ? "last_visit DESC" : """
+            (MIN(typed_count, 20) * 20 + MIN(visit_count, 30) * 5) * CASE
+                WHEN :now - last_visit < 4 * 86400 THEN 1.0
+                WHEN :now - last_visit < 14 * 86400 THEN 0.5
+                WHEN :now - last_visit < 31 * 86400 THEN 0.25
+                WHEN :now - last_visit < 90 * 86400 THEN 0.1
+                ELSE 0.05
+            END DESC, last_visit DESC
+            """
         return query(
             """
             SELECT url, title, visit_count, typed_count, last_visit FROM urls
             WHERE (visit_count > 0 OR typed_count > 0) AND \(condition)
-            ORDER BY last_visit DESC LIMIT ?
+            ORDER BY \(order) LIMIT ?
             """,
-            bindings + [.int(limit)]
+            // SQLite numbers `:now` after the terms on first use, and reuses it after that.
+            bindings + (bindings.isEmpty ? [] : [.double(now.timeIntervalSince1970)]) + [.int(limit)]
         ) { row in
             URL(string: row.text(0)).map {
                 HistoryEntry(
