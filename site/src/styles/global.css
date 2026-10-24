@@ -24,7 +24,7 @@
   --button: #15131d;
   --button-ink: #ffffff;
 
-  --sans: -apple-system, BlinkMacSystemFont, 'SF Pro Text', system-ui, sans-serif;
+  --sans: 'Geist Variable', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
   --hand: 'Caveat Variable', 'Bradley Hand', cursive;
   font-family: var(--sans);
   font-size: 17px;
@@ -79,6 +79,12 @@ h3 {
   font-weight: 700;
   line-height: 1.05;
   letter-spacing: -0.03em;
+  text-wrap: balance;
+}
+
+/* Keeps a lone last word off its own line in running text. */
+p {
+  text-wrap: pretty;
 }
 
 h3 {
@@ -309,7 +315,8 @@ h3 {
   box-shadow: inset 0 0 0 1.5px color-mix(in oklab, var(--accent) 45%, transparent);
 }
 
-/* Keycaps: a lone <kbd> is one key; a <kbd> holding others is a combo of keys. */
+/* Keycaps: a lone <kbd> is one key; a <kbd> holding others is a combo of keys. They keep the
+   system font because Geist has no ⌘ ⌥ ⌃ ⇧ glyphs. */
 kbd {
   display: inline-grid;
   place-items: center;
@@ -355,7 +362,6 @@ kbd:has(> kbd) {
 .intro h1 {
   font-size: clamp(2.4rem, 6.4vw, 5.4rem);
   line-height: 1;
-  text-wrap: balance;
 }
 
 .gradient-text {
