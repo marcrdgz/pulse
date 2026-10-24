@@ -502,7 +502,13 @@ final class Browser: NSObject {
         preferences.lastSeenVersion = appVersion
         let isUpdate = lastSeenVersion.map { $0.compare(appVersion, options: .numeric) == .orderedAscending }
             ?? preferences.hasCompletedOnboarding
-        guard isUpdate, releases.first(where: { $0.version == appVersion })?.highlights.isEmpty == false else { return }
+        // Look at every release since the last one seen, so skipping a minor for its patch still announces it.
+        let hasUnseenHighlights = releases.contains { release in
+            !release.highlights.isEmpty
+                && release.version.compare(appVersion, options: .numeric) != .orderedDescending
+                && lastSeenVersion.map { release.version.compare($0, options: .numeric) == .orderedDescending } ?? true
+        }
+        guard isUpdate, hasUnseenHighlights else { return }
         openTab(url: InternalPage.whatsNew.url)
     }
 

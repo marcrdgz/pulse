@@ -64,6 +64,20 @@ struct ReleaseNotesTests {
         #expect(browser.activeTab == nil)
     }
 
+    @Test func skippedReleaseHighlightsAnnounce() throws {
+        let browser = browser(lastSeenVersion: "1.0.0")
+        let releases = [try release("1.1.1", highlights: false), try release("1.1.0"), try release("1.0.0")]
+        browser.announceUpdate(to: "1.1.1", releases: releases)
+        #expect(browser.activeTab?.internalPage == .whatsNew)
+    }
+
+    @Test func alreadySeenHighlightsStayQuiet() throws {
+        let browser = browser(lastSeenVersion: "1.1.0")
+        let releases = [try release("1.1.1", highlights: false), try release("1.1.0")]
+        browser.announceUpdate(to: "1.1.1", releases: releases)
+        #expect(browser.activeTab == nil)
+    }
+
     @Test func downgradeStaysQuiet() throws {
         let browser = browser(lastSeenVersion: "0.4.0")
         browser.announceUpdate(to: "0.3.0", releases: [try release("0.3.0")])

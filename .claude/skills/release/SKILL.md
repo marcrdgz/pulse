@@ -69,7 +69,7 @@ Writing rules:
   ≤ 5 words. Body ≤ 2 sentences and says how to find it (a gesture, a menu, a setting).
   `symbol` is an SF Symbol that exists. `shortcut` only when a menu item has one: copy it from
   `BrowserCommands.swift` in the menu's order (⌃⌥⇧⌘). A patch release usually has none, and then
-  What's New doesn't open by itself after the update.
+  What's New opens after the update only for someone who skipped a release that had highlights.
 - **Improvements**: smaller visible changes, one sentence each, sentence case, with a full stop.
 - **Fixes**: describe what works now ("⌘W closes the tab, not the window"), not the bug.
 - Leave out invisible work: refactors, tests, the site, build changes.
