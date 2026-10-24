@@ -70,6 +70,39 @@ struct ChromeImportTests {
         #expect(history.visits().isEmpty)
     }
 
+    @Test func readsCookiesWithTheirAttributes() throws {
+        let profile = try makeProfile("Default")
+        let expiry = Date.now.addingTimeInterval(30 * 86_400)
+        try writeCookies(in: profile, expiry: expiry)
+
+        let cookies = try ChromeImport.cookies(of: profile) { Data("chrome-test-password".utf8) }
+
+        #expect(cookies.map(\.name) == ["session", "theme"])
+        let session = try #require(cookies.first)
+        #expect(session.domain == ".example.com")
+        #expect(session.path == "/")
+        #expect(session.value == "s3cr3t")
+        // HTTPCookie keeps whole seconds.
+        #expect(abs(try #require(session.expiresDate).timeIntervalSince(expiry)) < 1)
+        #expect(session.isSecure && session.isHTTPOnly && !session.isSessionOnly)
+        #expect(session.sameSitePolicy == .sameSiteLax)
+        let theme = try #require(cookies.last)
+        #expect(theme.domain == "app.example.com")
+        #expect(theme.path == "/settings")
+        #expect(theme.value == "dark")
+        #expect(theme.isSessionOnly && !theme.isSecure && !theme.isHTTPOnly)
+        #expect(theme.sameSitePolicy == .sameSiteStrict)
+    }
+
+    @Test func wrongKeychainPasswordFailsTheCookieImport() throws {
+        let profile = try makeProfile("Default")
+        try writeCookies(in: profile, expiry: .now.addingTimeInterval(86_400))
+
+        #expect(throws: ChromeImportError.unreadableCookies) {
+            try ChromeImport.cookies(of: profile) { Data("not-chromes-password".utf8) }
+        }
+    }
+
     @Test func showsOnboardingOnlyOnFirstLaunch() throws {
         let store = SessionStore(fileURL: chromeDirectory.appending(path: "session.json"))
         let preferences = Preferences()
@@ -139,6 +172,31 @@ struct ChromeImportTests {
             INSERT INTO visits VALUES (1, 1, \(time(visitDate)), 1);
             INSERT INTO visits VALUES (2, 1, \(time(visitDate.addingTimeInterval(60))), 805306368);
             INSERT INTO visits VALUES (3, 1, \(time(visitDate.addingTimeInterval(30))), 3);
+            """
+        try #require(sqlite3_exec(db, sql, nil, nil, nil) == SQLITE_OK)
+    }
+
+    /// Chrome's schema, reduced to the columns Pulse reads. The encrypted value was made with
+    /// openssl from the password "chrome-test-password", so it doesn't mirror Pulse's own crypto:
+    /// "v10" + AES-128-CBC(SHA-256(".example.com") + "s3cr3t").
+    private func writeCookies(in profile: ChromeProfile, expiry: Date) throws {
+        var db: OpaquePointer?
+        try #require(sqlite3_open(profile.directory.appending(path: "Cookies").path, &db) == SQLITE_OK)
+        defer { sqlite3_close(db) }
+        let time = { (date: Date) in Int64((date.timeIntervalSince1970 + 11_644_473_600) * 1_000_000) }
+        let future = time(expiry)
+        let past = time(Date(timeIntervalSince1970: 1_000_000_000))
+        let encrypted = "7631308625d318e1066788f47f1d442dc61c0e34aa193725dadce5ce33dbb735833f03e62607fad0d217d1b96d9d1bfaf2bf3b"
+        let sql = """
+            CREATE TABLE meta (key LONGVARCHAR NOT NULL UNIQUE PRIMARY KEY, value LONGVARCHAR);
+            INSERT INTO meta VALUES ('version', '24');
+            CREATE TABLE cookies (host_key TEXT, top_frame_site_key TEXT, name TEXT, value TEXT,
+                encrypted_value BLOB, path TEXT, expires_utc INTEGER, is_secure INTEGER, is_httponly INTEGER,
+                is_persistent INTEGER, samesite INTEGER);
+            INSERT INTO cookies VALUES ('.example.com', '', 'session', '', X'\(encrypted)', '/', \(future), 1, 1, 1, 1);
+            INSERT INTO cookies VALUES ('app.example.com', '', 'theme', 'dark', X'', '/settings', 0, 0, 0, 0, 2);
+            INSERT INTO cookies VALUES ('.example.com', '', 'expired', 'old', X'', '/', \(past), 0, 0, 1, -1);
+            INSERT INTO cookies VALUES ('.embed.com', 'https://example.com', 'partitioned', 'p', X'', '/', \(future), 1, 0, 1, 0);
             """
         try #require(sqlite3_exec(db, sql, nil, nil, nil) == SQLITE_OK)
     }
