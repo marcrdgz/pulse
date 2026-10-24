@@ -38,6 +38,18 @@ enum Theme {
         case .graphite: ((0xCFCFD6, 0xB5B8C2), (0x2E2E34, 0x24262C), 0x8A8D96)
         }
     }
+    /// Settings panes take their tiles in order along the halo's gradient, so the list reads as one sweep of the mark.
+    static func settingsTile(_ pane: SettingsPane) -> Color {
+        let hex: UInt32 = switch pane {
+        case .general: 0xF5862A
+        case .search: 0xE8506A
+        case .downloads: 0xD2337E
+        case .privacy: 0x7B4DFF
+        case .extensions: 0x4B3BB8
+        }
+        return Color(nsColor: NSColor(hex: hex))
+    }
+
     static let sidebarText = Color.dynamic(light: NSColor(hex: 0x1F1B33), dark: NSColor(hex: 0xF2F0FA))
     static let activeTabFill = Color.dynamic(light: .white.withAlphaComponent(0.85), dark: .white.withAlphaComponent(0.16))
     static let hoverFill = Color.dynamic(light: .white.withAlphaComponent(0.3), dark: .white.withAlphaComponent(0.07))

@@ -1,36 +1,105 @@
 import AppKit
 import SwiftUI
 
-/// The Settings window's tabs; stored so other windows can open it on a given pane.
-enum SettingsPane: String {
+/// The Settings window's panes; stored so other windows can open it on a given pane.
+enum SettingsPane: String, CaseIterable, Identifiable {
     case general, search, downloads, privacy, extensions
 
     static let storageKey = "settingsPane"
+
+    var id: Self { self }
+
+    var title: String {
+        switch self {
+        case .general: "General"
+        case .search: "Search"
+        case .downloads: "Downloads"
+        case .privacy: "Privacy"
+        case .extensions: "Extensions"
+        }
+    }
+
+    var systemImage: String {
+        switch self {
+        case .general: "gearshape.fill"
+        case .search: "magnifyingglass"
+        case .downloads: "arrow.down"
+        case .privacy: "hand.raised.fill"
+        case .extensions: "puzzlepiece.extension.fill"
+        }
+    }
+
+    /// What the sidebar's search field matches besides the title: the settings each pane holds.
+    private var keywords: [String] {
+        switch self {
+        case .general: ["default browser", "startup", "peek", "pinned", "memory", "sleep", "tabs"]
+        case .search: ["search engine", "suggestions", "address bar"]
+        case .downloads: ["location", "finder", "save", "files"]
+        case .privacy: ["history", "cookies", "cache", "clear browsing data", "ads", "trackers",
+                        "permissions", "camera", "microphone"]
+        case .extensions: ["install", "chrome web store", "zip", "crx", "options"]
+        }
+    }
+
+    func matches(_ query: String) -> Bool {
+        query.isEmpty || ([title] + keywords).contains { $0.localizedStandardContains(query) }
+    }
 }
 
-/// ⌘, — the options Chrome has in chrome://settings that apply to Pulse, as a native window.
+/// ⌘, — the options Chrome has in chrome://settings that apply to Pulse, as a native window
+/// laid out like System Settings: a searchable list of panes beside the selected one.
 struct SettingsView: View {
     @AppStorage(SettingsPane.storageKey) private var pane = SettingsPane.general
+    @State private var query = ""
 
     var body: some View {
-        TabView(selection: $pane) {
-            GeneralSettings()
-                .tabItem { Label("General", systemImage: "gearshape") }
-                .tag(SettingsPane.general)
-            SearchSettings()
-                .tabItem { Label("Search", systemImage: "magnifyingglass") }
-                .tag(SettingsPane.search)
-            DownloadSettings()
-                .tabItem { Label("Downloads", systemImage: "arrow.down.circle") }
-                .tag(SettingsPane.downloads)
-            PrivacySettings()
-                .tabItem { Label("Privacy", systemImage: "hand.raised") }
-                .tag(SettingsPane.privacy)
-            ExtensionSettings()
-                .tabItem { Label("Extensions", systemImage: "puzzlepiece.extension") }
-                .tag(SettingsPane.extensions)
+        NavigationSplitView {
+            List(SettingsPane.allCases.filter { $0.matches(query) }, selection: selection) { pane in
+                Label {
+                    Text(pane.title)
+                } icon: {
+                    PaneTile(pane: pane)
+                }
+            }
+            .searchable(text: $query, placement: .sidebar)
+            .navigationSplitViewColumnWidth(200)
+            .toolbar(removing: .sidebarToggle)
+        } detail: {
+            detail
+                .navigationTitle(pane.title)
         }
-        .frame(width: 520)
+        .frame(width: 720, height: 520)
+    }
+
+    /// The list deselects on an empty click; keep the current pane instead of showing nothing.
+    private var selection: Binding<SettingsPane?> {
+        Binding(get: { pane }, set: { if let newValue = $0 { pane = newValue } })
+    }
+
+    @ViewBuilder private var detail: some View {
+        switch pane {
+        case .general: GeneralSettings()
+        case .search: SearchSettings()
+        case .downloads: DownloadSettings()
+        case .privacy: PrivacySettings()
+        case .extensions: ExtensionSettings()
+        }
+    }
+}
+
+/// System Settings' coloured icon square, so the sidebar scans by colour as well as by name.
+private struct PaneTile: View {
+    let pane: SettingsPane
+
+    var body: some View {
+        RoundedRectangle(cornerRadius: 5, style: .continuous)
+            .fill(Theme.settingsTile(pane).gradient)
+            .frame(width: 20, height: 20)
+            .overlay {
+                Image(systemName: pane.systemImage)
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle(.white)
+            }
     }
 }
 
@@ -41,9 +110,12 @@ private struct GeneralSettings: View {
     var body: some View {
         @Bindable var preferences = browser.preferences
         Form {
-            Section("Default browser") {
-                LabeledContent(isDefaultBrowser ? "Pulse is your default browser" : "Pulse isn't your default browser") {
-                    if !isDefaultBrowser {
+            Section {
+                LabeledContent {
+                    if isDefaultBrowser {
+                        Label("Default", systemImage: "checkmark.circle.fill")
+                            .foregroundStyle(.green)
+                    } else {
                         Button("Make Default") {
                             Task {
                                 await DefaultBrowser.makeDefault()
@@ -51,43 +123,122 @@ private struct GeneralSettings: View {
                             }
                         }
                     }
+                } label: {
+                    Text("Default browser")
+                    Text(isDefaultBrowser ? "Links from other apps open in Pulse." : "Links from other apps open in another browser.")
                 }
             }
-            Section("On startup") {
-                Picker("On startup", selection: $preferences.startupBehavior) {
-                    ForEach(StartupBehavior.allCases) { Text($0.title).tag($0) }
+            Section {
+                VStack(alignment: .leading, spacing: 10) {
+                    Text("On startup")
+                    HStack(spacing: 12) {
+                        ForEach(StartupBehavior.allCases) { behavior in
+                            StartupOption(
+                                behavior: behavior,
+                                theme: browser.activeSpace.theme,
+                                isSelected: preferences.startupBehavior == behavior
+                            ) {
+                                preferences.startupBehavior = behavior
+                            }
+                        }
+                    }
+                    Text("Favorites and pinned tabs always come back.")
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
                 }
-                .pickerStyle(.radioGroup)
-                .labelsHidden()
-                Text("Favorites and pinned tabs always come back.")
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
+                .padding(.vertical, 4)
             }
             Section {
-                Toggle("Open links to other sites from pinned tabs in Peek", isOn: $preferences.opensPinnedLinksInPeek)
-            } header: {
-                Text("Peek")
-            } footer: {
-                Text("Peek previews a link over the page, so pinned tabs stay where they were. "
-                    + "⇧-click any link to peek at it.")
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
-            }
-            Section {
-                Picker("Sleep inactive tabs after", selection: $preferences.tabSleepDelay) {
+                Toggle(isOn: $preferences.opensPinnedLinksInPeek) {
+                    Text("Open links from pinned tabs in Peek")
+                    Text("Links to other sites preview over the page, so the pinned tab stays where it was. ⇧-click any link to peek at it.")
+                }
+                Picker(selection: $preferences.tabSleepDelay) {
                     ForEach(TabSleepDelay.allCases) { Text($0.title).tag($0) }
+                } label: {
+                    Text("Sleep inactive tabs after")
+                    Text("Sleeping tabs free their memory and reload where they were. Tabs playing audio or using your camera or microphone stay awake.")
                 }
-            } header: {
-                Text("Memory")
-            } footer: {
-                Text("Sleeping tabs free their memory and reload where they were when you return. "
-                    + "Tabs playing audio or using your camera or microphone stay awake.")
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
             }
         }
         .settingsPane()
         .onAppear { isDefaultBrowser = DefaultBrowser.isDefault }
+    }
+}
+
+/// One way to start, drawn as a miniature sidebar in the active space's colours: what you see is
+/// what the sidebar looks like after relaunching.
+private struct StartupOption: View {
+    let behavior: StartupBehavior
+    let theme: SpaceTheme
+    let isSelected: Bool
+    let select: () -> Void
+
+    var body: some View {
+        Button(action: select) {
+            VStack(alignment: .leading, spacing: 8) {
+                miniature
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 112)
+                    .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                    .overlay {
+                        RoundedRectangle(cornerRadius: 8, style: .continuous)
+                            .strokeBorder(isSelected ? Color.accentColor : Color.primary.opacity(0.12), lineWidth: isSelected ? 2.5 : 1)
+                    }
+                HStack(spacing: 6) {
+                    Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
+                        .foregroundStyle(isSelected ? Color.accentColor : Color.secondary)
+                    Text(behavior.title)
+                        .lineLimit(1)
+                }
+            }
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityAddTraits(isSelected ? .isSelected : [])
+        .animation(.easeOut(duration: 0.15), value: isSelected)
+    }
+
+    private var miniature: some View {
+        VStack(alignment: .leading, spacing: 5) {
+            HStack(spacing: 5) {
+                ForEach(0..<3, id: \.self) { _ in
+                    RoundedRectangle(cornerRadius: 3, style: .continuous)
+                        .fill(Theme.activeTabFill)
+                        .frame(width: 22, height: 16)
+                }
+            }
+            bar(width: 0.7)
+            bar(width: 0.55)
+            Rectangle()
+                .fill(Theme.sidebarText.opacity(0.15))
+                .frame(height: 1)
+                .padding(.vertical, 2)
+            switch behavior {
+            case .continueWhereYouLeftOff:
+                bar(width: 0.8)
+                bar(width: 0.6)
+                bar(width: 0.7)
+            case .clearToday:
+                RoundedRectangle(cornerRadius: 3, style: .continuous)
+                    .strokeBorder(Theme.sidebarText.opacity(0.3), style: StrokeStyle(lineWidth: 1, dash: [3, 3]))
+                    .frame(height: 9)
+            }
+            Spacer(minLength: 0)
+        }
+        .padding(10)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Theme.sidebarGradient(theme))
+        .accessibilityHidden(true)
+    }
+
+    private func bar(width: CGFloat) -> some View {
+        GeometryReader { proxy in
+            RoundedRectangle(cornerRadius: 3, style: .continuous)
+                .fill(Theme.pillFill)
+                .frame(width: proxy.size.width * width)
+        }
+        .frame(height: 9)
     }
 }
 
@@ -98,14 +249,16 @@ private struct SearchSettings: View {
         @Bindable var preferences = browser.preferences
         Form {
             Section {
-                Picker("Search engine", selection: $preferences.searchEngine) {
+                Picker(selection: $preferences.searchEngine) {
                     ForEach(SearchEngine.allCases) { Text($0.name).tag($0) }
+                } label: {
+                    Text("Search engine")
+                    Text("Used for searches from the address bar and the command bar.")
                 }
-                Toggle("Show search suggestions", isOn: $preferences.showsSearchSuggestions)
-            } footer: {
-                Text("Suggestions send what you type in the address bar to \(preferences.searchEngine.name).")
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
+                Toggle(isOn: $preferences.showsSearchSuggestions) {
+                    Text("Show search suggestions")
+                    Text("Sends what you type in the address bar to \(preferences.searchEngine.name).")
+                }
             }
         }
         .settingsPane()
@@ -119,15 +272,27 @@ private struct DownloadSettings: View {
         @Bindable var preferences = browser.preferences
         Form {
             Section {
-                LabeledContent("Location") {
-                    HStack {
-                        Text("Downloads")
-                        Button("Show in Finder") {
-                            NSWorkspace.shared.open(URL.downloadsDirectory)
+                LabeledContent {
+                    Button("Show in Finder") {
+                        NSWorkspace.shared.open(URL.downloadsDirectory)
+                    }
+                } label: {
+                    HStack(spacing: 10) {
+                        Image(nsImage: NSWorkspace.shared.icon(forFile: URL.downloadsDirectory.path))
+                            .resizable()
+                            .frame(width: 32, height: 32)
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Downloads")
+                            Text("Files save here unless you choose otherwise.")
+                                .font(.footnote)
+                                .foregroundStyle(.secondary)
                         }
                     }
                 }
-                Toggle("Ask where to save each file before downloading", isOn: $preferences.asksWhereToSaveDownloads)
+                Toggle(isOn: $preferences.asksWhereToSaveDownloads) {
+                    Text("Ask where to save each file")
+                    Text("Choose a folder before each download starts.")
+                }
             }
         }
         .settingsPane()
@@ -142,8 +307,22 @@ private struct ExtensionSettings: View {
             if let extensions = browser.extensions {
                 Section {
                     if extensions.contexts.isEmpty {
-                        Text("Extensions you add appear here.")
-                            .foregroundStyle(.secondary)
+                        VStack(spacing: 8) {
+                            Image(systemName: "puzzlepiece.extension")
+                                .font(.system(size: 28, weight: .light))
+                                .foregroundStyle(.secondary)
+                            Text("No extensions yet")
+                                .fontWeight(.medium)
+                            Text("Open an extension's page in the Chrome Web Store and click \"Add to Pulse\", or install a folder, ZIP or CRX file.")
+                                .font(.footnote)
+                                .foregroundStyle(.secondary)
+                                .multilineTextAlignment(.center)
+                                .frame(maxWidth: 320)
+                            Button("Install from File…", action: extensions.chooseAndInstall)
+                                .padding(.top, 4)
+                        }
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 20)
                     }
                     ForEach(extensions.contexts, id: \.uniqueIdentifier) { context in
                         let webExtension = context.webExtension
@@ -152,12 +331,21 @@ private struct ExtensionSettings: View {
                                 Image(nsImage: icon).resizable().frame(width: 32, height: 32)
                             }
                             VStack(alignment: .leading, spacing: 2) {
-                                Text(webExtension.displayName ?? "Extension")
-                                    .fontWeight(.medium)
-                                Text([webExtension.displayVersion, webExtension.displayDescription].compactMap(\.self).joined(separator: " · "))
-                                    .font(.footnote)
-                                    .foregroundStyle(.secondary)
-                                    .lineLimit(2)
+                                HStack(alignment: .firstTextBaseline, spacing: 6) {
+                                    Text(webExtension.displayName ?? "Extension")
+                                        .fontWeight(.medium)
+                                    if let version = webExtension.displayVersion {
+                                        Text(version)
+                                            .font(.footnote)
+                                            .foregroundStyle(.tertiary)
+                                    }
+                                }
+                                if let description = webExtension.displayDescription {
+                                    Text(description)
+                                        .font(.footnote)
+                                        .foregroundStyle(.secondary)
+                                        .lineLimit(2)
+                                }
                             }
                             Spacer()
                             if context.optionsPageURL != nil {
@@ -167,12 +355,14 @@ private struct ExtensionSettings: View {
                         }
                     }
                 } footer: {
-                    HStack {
-                        Text("Add extensions from their Chrome Web Store page, or install a folder, ZIP or CRX file.")
-                            .font(.footnote)
-                            .foregroundStyle(.secondary)
-                        Spacer()
-                        Button("Install from File…", action: extensions.chooseAndInstall)
+                    if !extensions.contexts.isEmpty {
+                        HStack {
+                            Text("Add more from the Chrome Web Store, or install a folder, ZIP or CRX file.")
+                                .font(.footnote)
+                                .foregroundStyle(.secondary)
+                            Spacer()
+                            Button("Install from File…", action: extensions.chooseAndInstall)
+                        }
                     }
                 }
             }
@@ -189,31 +379,40 @@ private struct PrivacySettings: View {
         let blocker = browser.contentBlocker
         Form {
             Section {
-                LabeledContent("Delete history, cookies and cache") {
+                LabeledContent {
                     Button("Clear Browsing Data…", action: browser.showClearBrowsingData)
+                } label: {
+                    Text("Browsing data")
+                    Text("Delete history, cookies and cached files.")
                 }
             }
             Section {
-                Toggle("Block ads and trackers", isOn: Binding(get: { blocker.isEnabled }, set: { blocker.setEnabled($0) }))
+                Toggle(isOn: Binding(get: { blocker.isEnabled }, set: { blocker.setEnabled($0) })) {
+                    Text("Block ads and trackers")
+                    Text(contentBlockerCaption(lastUpdate: blocker.lastUpdate))
+                }
                 ForEach(browser.preferences.adsAllowedSites, id: \.self) { site in
-                    LabeledContent(site) {
+                    LabeledContent {
                         Button("Block Ads") { blocker.setBlocking(true, onSite: site) }
+                    } label: {
+                        Text(site)
+                        Text("Ads allowed")
                     }
                 }
-            } header: {
-                Text("Ads and trackers")
             } footer: {
-                Text(contentBlockerFooter(lastUpdate: blocker.lastUpdate))
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
+                if !browser.preferences.adsAllowedSites.isEmpty {
+                    Text("Allow ads on a site from its address bar's menu.")
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                }
             }
-            Section("Site permissions") {
+            Section("Camera and microphone") {
                 if sites.isEmpty {
-                    Text("Sites you allow or block from using your camera or microphone appear here.")
+                    Text("Sites you allow or block appear here.")
                         .foregroundStyle(.secondary)
                 }
                 ForEach(sites, id: \.origin) { site in
-                    VStack(alignment: .leading, spacing: 6) {
+                    VStack(alignment: .leading, spacing: 8) {
                         HStack {
                             Text(site.origin)
                                 .fontWeight(.medium)
@@ -221,11 +420,16 @@ private struct PrivacySettings: View {
                             Button("Reset") { reset(site.origin) }
                         }
                         ForEach(PermissionKind.allCases, id: \.self) { kind in
-                            Picker(kind == .camera ? "Camera" : "Microphone", selection: binding(site.origin, kind)) {
+                            Picker(selection: binding(site.origin, kind)) {
                                 Text("Ask").tag(Bool?.none)
                                 Text("Allow").tag(Bool?.some(true))
                                 Text("Block").tag(Bool?.some(false))
+                            } label: {
+                                Label(kind == .camera ? "Camera" : "Microphone", systemImage: kind == .camera ? "video" : "mic")
                             }
+                            .pickerStyle(.segmented)
+                            .fixedSize()
+                            .frame(maxWidth: .infinity, alignment: .leading)
                         }
                     }
                     .padding(.vertical, 2)
@@ -240,11 +444,10 @@ private struct PrivacySettings: View {
         sites = browser.sitePermissions?.allDecisions() ?? []
     }
 
-    private func contentBlockerFooter(lastUpdate: Date?) -> String {
+    private func contentBlockerCaption(lastUpdate: Date?) -> String {
         let lists = "Uses EasyList and EasyPrivacy"
-        guard let lastUpdate else { return lists + "; they download the first time Pulse runs." }
-        return lists + ", updated \(lastUpdate.formatted(.relative(presentation: .named))). "
-            + "Sites listed above load ads; allow one from its address bar's menu."
+        guard let lastUpdate else { return lists + ", downloaded the first time Pulse runs." }
+        return lists + ", updated \(lastUpdate.formatted(.relative(presentation: .named)))."
     }
 
     private func binding(_ origin: String, _ kind: PermissionKind) -> Binding<Bool?> {
@@ -266,10 +469,7 @@ private struct PrivacySettings: View {
 }
 
 private extension View {
-    /// Sizes the window to the pane like System Settings, scrolling only once a list outgrows the cap.
     func settingsPane() -> some View {
         formStyle(.grouped)
-            .frame(maxHeight: 640)
-            .fixedSize(horizontal: false, vertical: true)
     }
 }
