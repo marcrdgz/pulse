@@ -73,30 +73,30 @@ final class HistoryStore {
 
     func recordVisit(url: URL, title: String, at date: Date = .now) {
         // One commit per visit rather than per statement: this runs on the main thread on every navigation.
-        execute("BEGIN")
-        defer { execute("COMMIT") }
-        execute(
-            "INSERT INTO urls (url, title, last_visit) VALUES (?, ?, 0) ON CONFLICT(url) DO NOTHING",
-            [.text(url.absoluteString), .text(title)]
-        )
-        let lastVisit = query("SELECT last_visit FROM urls WHERE url = ?", [.text(url.absoluteString)]) {
-            Date(timeIntervalSince1970: $0.double(0))
-        }.first ?? .distantPast
-
-        if date.timeIntervalSince(lastVisit) >= revisitInterval {
+        transaction {
             execute(
-                "INSERT INTO visits (url_id, time) SELECT id, ? FROM urls WHERE url = ?",
-                [.double(date.timeIntervalSince1970), .text(url.absoluteString)]
+                "INSERT INTO urls (url, title, last_visit) VALUES (?, ?, 0) ON CONFLICT(url) DO NOTHING",
+                [.text(url.absoluteString), .text(title)]
             )
+            let lastVisit = query("SELECT last_visit FROM urls WHERE url = ?", [.text(url.absoluteString)]) {
+                Date(timeIntervalSince1970: $0.double(0))
+            }.first ?? .distantPast
+
+            if date.timeIntervalSince(lastVisit) >= revisitInterval {
+                execute(
+                    "INSERT INTO visits (url_id, time) SELECT id, ? FROM urls WHERE url = ?",
+                    [.double(date.timeIntervalSince1970), .text(url.absoluteString)]
+                )
+                execute(
+                    "UPDATE urls SET visit_count = visit_count + 1 WHERE url = ?",
+                    [.text(url.absoluteString)]
+                )
+            }
             execute(
-                "UPDATE urls SET visit_count = visit_count + 1 WHERE url = ?",
-                [.text(url.absoluteString)]
+                "UPDATE urls SET last_visit = ?, title = CASE WHEN ? = '' THEN title ELSE ? END WHERE url = ?",
+                [.double(date.timeIntervalSince1970), .text(title), .text(title), .text(url.absoluteString)]
             )
         }
-        execute(
-            "UPDATE urls SET last_visit = ?, title = CASE WHEN ? = '' THEN title ELSE ? END WHERE url = ?",
-            [.double(date.timeIntervalSince1970), .text(title), .text(title), .text(url.absoluteString)]
-        )
         revision += 1
     }
 
@@ -208,8 +208,7 @@ final class HistoryStore {
     func deleteVisits(_ ids: [Int64]) {
         guard !ids.isEmpty else { return }
         let placeholders = Array(repeating: "?", count: ids.count).joined(separator: ", ")
-        execute("DELETE FROM visits WHERE id IN (\(placeholders))", ids.map { .int($0) })
-        pruneURLs()
+        removeVisits(where: "id IN (\(placeholders))", ids.map { .int($0) })
     }
 
     /// Removes the URL and all its visits, e.g. ⇧⌦ on a suggestion.
@@ -220,23 +219,39 @@ final class HistoryStore {
 
     /// Everything since `date`, or the whole history when `nil`.
     func deleteVisits(since date: Date?) {
-        if let date {
-            execute("DELETE FROM visits WHERE time >= ?", [.double(date.timeIntervalSince1970)])
-        } else {
-            execute("DELETE FROM visits")
-            execute("DELETE FROM urls")
+        guard let date else {
+            transaction {
+                execute("DELETE FROM visits")
+                execute("DELETE FROM urls")
+            }
+            revision += 1
+            return
         }
-        pruneURLs()
+        removeVisits(where: "time >= ?", [.double(date.timeIntervalSince1970)])
     }
 
-    /// Keeps the per-URL counters in step with the remaining visits and drops URLs left without any.
-    private func pruneURLs() {
-        execute("""
-            UPDATE urls SET
-                visit_count = (SELECT COUNT(*) FROM visits WHERE url_id = urls.id),
-                last_visit = COALESCE((SELECT MAX(time) FROM visits WHERE url_id = urls.id), 0)
-            """)
-        execute("DELETE FROM urls WHERE visit_count = 0")
+    /// Takes the removed visits off their URLs' counters and drops URLs left without visits. Only
+    /// those URLs change: counters needn't match the visit rows, since Chrome's outlive its visits.
+    private func removeVisits(where condition: String, _ bindings: [Binding]) {
+        transaction {
+            let removedCounts = query(
+                "SELECT url_id, COUNT(*) FROM visits WHERE \(condition) GROUP BY url_id",
+                bindings
+            ) { (urlID: $0.int(0), count: $0.int(1)) }
+            execute("DELETE FROM visits WHERE \(condition)", bindings)
+            for (urlID, count) in removedCounts {
+                execute("""
+                    UPDATE urls SET
+                        visit_count = MAX(visit_count - ?, 0),
+                        last_visit = COALESCE((SELECT MAX(time) FROM visits WHERE url_id = urls.id), 0)
+                    WHERE id = ?
+                    """, [.int(count), .int(urlID)])
+                execute(
+                    "DELETE FROM urls WHERE id = ? AND NOT EXISTS (SELECT 1 FROM visits WHERE url_id = urls.id)",
+                    [.int(urlID)]
+                )
+            }
+        }
         revision += 1
     }
 
@@ -265,6 +280,13 @@ final class HistoryStore {
         guard !terms.isEmpty else { return ("1", []) }
         let condition = terms.map { _ in "(urls.url LIKE ? OR urls.title LIKE ?)" }.joined(separator: " AND ")
         return (condition, terms.flatMap { [Binding.text($0), .text($0)] })
+    }
+
+    /// Commits the statements together: none of them lands without the others, and only one syncs to disk.
+    private func transaction(_ statements: () -> Void) {
+        execute("BEGIN")
+        statements()
+        execute("COMMIT")
     }
 
     @discardableResult

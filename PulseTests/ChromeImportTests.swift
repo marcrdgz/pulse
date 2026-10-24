@@ -55,6 +55,22 @@ struct ChromeImportTests {
         #expect(history.entries(matching: "").count == 1)
     }
 
+    @Test func deletingVisitsKeepsImportedCountersOfOtherPages() async throws {
+        let profile = try makeProfile("Default")
+        try writeHistory(in: profile, visitCount: 40)
+        let history = try #require(HistoryStore(path: ":memory:"))
+        _ = try await Browser(history: history).importFromChrome(profile, items: .history)
+        let github = URL(string: "https://github.com/")!
+        history.recordVisit(url: github, title: "GitHub", at: visitDate)
+
+        history.deleteVisits(history.visits(matching: "github").map(\.id))
+        #expect(history.entries(matching: "").map(\.visitCount) == [40])
+
+        history.deleteVisits([history.visits(matching: "swift")[0].id])
+        #expect(history.entries(matching: "").map(\.visitCount) == [39])
+        #expect(history.entries(matching: "").first?.lastVisit == visitDate)
+    }
+
     @Test func unreadableCookiesLeaveEverythingUnchanged() async throws {
         let profile = try makeProfile("Default")
         try writeBookmarks(in: profile)
@@ -157,7 +173,8 @@ struct ChromeImportTests {
     }
 
     /// Chrome's schema, reduced to the columns Pulse reads.
-    private func writeHistory(in profile: ChromeProfile) throws {
+    /// Chrome keeps a URL's `visitCount` after expiring its old visits, so it can exceed the visit rows.
+    private func writeHistory(in profile: ChromeProfile, visitCount: Int = 2) throws {
         var db: OpaquePointer?
         try #require(sqlite3_open(profile.directory.appending(path: "History").path, &db) == SQLITE_OK)
         defer { sqlite3_close(db) }
@@ -166,7 +183,7 @@ struct ChromeImportTests {
             CREATE TABLE urls (id INTEGER PRIMARY KEY, url TEXT, title TEXT, visit_count INTEGER,
                 typed_count INTEGER, last_visit_time INTEGER, hidden INTEGER DEFAULT 0);
             CREATE TABLE visits (id INTEGER PRIMARY KEY, url INTEGER, visit_time INTEGER, transition INTEGER);
-            INSERT INTO urls VALUES (1, 'https://swift.org/', 'Swift', 2, 1, \(time(visitDate.addingTimeInterval(60))), 0);
+            INSERT INTO urls VALUES (1, 'https://swift.org/', 'Swift', \(visitCount), 1, \(time(visitDate.addingTimeInterval(60))), 0);
             INSERT INTO urls VALUES (2, 'https://ads.example/frame', 'Ad', 1, 0, \(time(visitDate)), 1);
             INSERT INTO urls VALUES (3, 'chrome://settings/', 'Settings', 1, 0, \(time(visitDate)), 0);
             INSERT INTO visits VALUES (1, 1, \(time(visitDate)), 1);
