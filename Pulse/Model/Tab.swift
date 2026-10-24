@@ -340,13 +340,19 @@ final class Tab: NSObject, Identifiable {
             changes.insert(.title)
             browser?.tabTitleDidChange(self)
         }
-        if webView.isLoading != isLoading { changes.insert(.loading) }
-        isLoading = webView.isLoading
-        estimatedProgress = webView.estimatedProgress
-        canGoBack = webView.canGoBack
-        canGoForward = webView.canGoForward
-        cameraCaptureState = webView.cameraCaptureState
-        microphoneCaptureState = webView.microphoneCaptureState
+        if webView.isLoading != isLoading {
+            isLoading = webView.isLoading
+            changes.insert(.loading)
+        }
+        // Observation notifies on every assignment, even of the same value, and this runs on each
+        // progress tick: only changes should redraw the views reading them.
+        if estimatedProgress != webView.estimatedProgress { estimatedProgress = webView.estimatedProgress }
+        if canGoBack != webView.canGoBack { canGoBack = webView.canGoBack }
+        if canGoForward != webView.canGoForward { canGoForward = webView.canGoForward }
+        if cameraCaptureState != webView.cameraCaptureState { cameraCaptureState = webView.cameraCaptureState }
+        if microphoneCaptureState != webView.microphoneCaptureState {
+            microphoneCaptureState = webView.microphoneCaptureState
+        }
         if didChangePage { browser?.tabDidUpdate() }
         if !changes.isEmpty { browser?.extensions?.controller.didChangeTabProperties(changes, for: self) }
     }
