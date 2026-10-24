@@ -36,12 +36,15 @@ enum ChromeImportError: LocalizedError {
     case unreadableBookmarks
     case unreadableHistory
     case unreadableCookies
+    case keychainAccessDenied
 
     var errorDescription: String? {
         switch self {
         case .unreadableBookmarks: "Pulse couldn't read Chrome's bookmarks."
         case .unreadableHistory: "Pulse couldn't read Chrome's history."
         case .unreadableCookies: "Pulse couldn't read Chrome's cookies."
+        case .keychainAccessDenied:
+            "Pulse needs your permission to read Chrome's cookies. Import again and choose Allow when macOS asks to use “Chrome Safe Storage”."
         }
     }
 }
@@ -138,10 +141,15 @@ enum ChromeImport {
             kSecReturnData: true,
         ]
         var item: CFTypeRef?
-        guard SecItemCopyMatching(query as CFDictionary, &item) == errSecSuccess, let password = item as? Data else {
-            throw ChromeImportError.unreadableCookies
+        switch SecItemCopyMatching(query as CFDictionary, &item) {
+        case errSecSuccess:
+            guard let password = item as? Data else { throw ChromeImportError.unreadableCookies }
+            return password
+        // Chrome never saved a key, so there's nothing the user could allow.
+        case errSecItemNotFound: throw ChromeImportError.unreadableCookies
+        // Deny in the keychain prompt, or the prompt couldn't be shown.
+        default: throw ChromeImportError.keychainAccessDenied
         }
-        return password
     }
 
     /// Runs `body` on a copy of the profile's `History` database. The copy is deleted afterwards.
