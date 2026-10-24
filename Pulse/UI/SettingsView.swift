@@ -64,6 +64,16 @@ private struct GeneralSettings: View {
                     .foregroundStyle(.secondary)
             }
             Section {
+                Toggle("Open links to other sites from pinned tabs in Peek", isOn: $preferences.opensPinnedLinksInPeek)
+            } header: {
+                Text("Peek")
+            } footer: {
+                Text("Peek previews a link over the page, so pinned tabs stay where they were. "
+                    + "⇧-click any link to peek at it.")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+            }
+            Section {
                 Picker("Sleep inactive tabs after", selection: $preferences.tabSleepDelay) {
                     ForEach(TabSleepDelay.allCases) { Text($0.title).tag($0) }
                 }

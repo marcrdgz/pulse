@@ -36,6 +36,10 @@ final class WebViewCoordinator: NSObject, WKNavigationDelegate, WKUIDelegate {
             openInOtherApp(url, askFirst: navigationAction.navigationType != .linkActivated, from: webView.url)
             return
         }
+        if openInPeek(navigationAction) {
+            decisionHandler(.cancel)
+            return
+        }
         if case .newTab(let activate) = LinkTarget(navigationAction), let url = navigationAction.request.url {
             tab?.browser?.openTab(url: url, activate: activate).opener = tab
             decisionHandler(.cancel)
@@ -123,6 +127,9 @@ final class WebViewCoordinator: NSObject, WKNavigationDelegate, WKUIDelegate {
         if let url = navigationAction.request.url, openForContextMenu(url) {
             return nil
         }
+        if openInPeek(navigationAction) {
+            return nil
+        }
         if case .newTab(let activate) = LinkTarget(navigationAction), let url = navigationAction.request.url {
             browser.openTab(url: url, activate: activate).opener = tab
             return nil
@@ -202,6 +209,19 @@ final class WebViewCoordinator: NSObject, WKNavigationDelegate, WKUIDelegate {
         panel.allowsMultipleSelection = parameters.allowsMultipleSelection
         panel.canChooseDirectories = parameters.allowsDirectories
         return panel.runModal() == .OK ? panel.urls : nil
+    }
+
+    /// Only clicks peek: a page opening a window by script (a sign-in popup) needs a real one.
+    private func openInPeek(_ action: WKNavigationAction) -> Bool {
+        guard action.navigationType == .linkActivated, let tab, let browser = tab.browser,
+              let url = action.request.url
+        else { return false }
+        // No target frame means a new window (`target=_blank`), which leaves the page too.
+        let leavesPage = action.targetFrame?.isMainFrame ?? true
+        guard browser.opensInPeek(url, clickedIn: tab, target: LinkTarget(action), leavesPage: leavesPage)
+        else { return false }
+        browser.openPeek(url, from: tab)
+        return true
     }
 
     private func openInOtherApp(_ url: URL, askFirst: Bool, from pageURL: URL?) {

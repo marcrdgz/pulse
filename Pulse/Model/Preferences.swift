@@ -114,6 +114,8 @@ final class Preferences {
     var adsAllowedSites: [String] { didSet { save(adsAllowedSites, Key.adsAllowedSites) } }
     /// How long a tab stays off screen before it sleeps.
     var tabSleepDelay: TabSleepDelay { didSet { save(tabSleepDelay.rawValue, Key.tabSleepDelay) } }
+    /// Links from a pinned tab or favorite to another site open in Peek, like Arc, so the pinned page stays put.
+    var opensPinnedLinksInPeek: Bool { didSet { save(opensPinnedLinksInPeek, Key.pinnedLinksInPeek) } }
     /// The version whose What's New was last offered, so each update announces itself once.
     var lastSeenVersion: String? { didSet { if let lastSeenVersion { save(lastSeenVersion, Key.lastSeenVersion) } } }
 
@@ -128,6 +130,7 @@ final class Preferences {
         static let blocksAds = "blocksAdsAndTrackers"
         static let adsAllowedSites = "adsAllowedSites"
         static let tabSleepDelay = "tabSleepDelayMinutes"
+        static let pinnedLinksInPeek = "opensPinnedLinksInPeek"
         static let lastSeenVersion = "lastSeenVersion"
     }
 
@@ -141,6 +144,7 @@ final class Preferences {
         blocksAdsAndTrackers = defaults?.object(forKey: Key.blocksAds) as? Bool ?? true
         adsAllowedSites = defaults?.stringArray(forKey: Key.adsAllowedSites) ?? []
         tabSleepDelay = (defaults?.object(forKey: Key.tabSleepDelay) as? Int).flatMap(TabSleepDelay.init) ?? .oneHour
+        opensPinnedLinksInPeek = defaults?.object(forKey: Key.pinnedLinksInPeek) as? Bool ?? true
         lastSeenVersion = defaults?.string(forKey: Key.lastSeenVersion)
     }
 

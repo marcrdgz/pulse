@@ -6,6 +6,8 @@ struct BrowserWindow: View {
     @AppStorage("sidebarWidth") private var sidebarWidth = Theme.defaultSidebarWidth
     @State private var isPeekingSidebar = false
     @State private var peekTask: Task<Void, Never>?
+    /// Set the update before Peek expands, so its card leaves without the closing transition.
+    @State private var isExpandingPeek = false
     @State private var shortcutMonitor: Any?
     /// Shared by the sidebar and the page, which takes tabs dragged onto it into a split view.
     @State private var dragController = SidebarDragController()
@@ -35,6 +37,11 @@ struct BrowserWindow: View {
                         .transition(.opacity)
                 }
                 content
+                    .overlay {
+                        if let peek = browser.peek {
+                            peekOverlay(peek)
+                        }
+                    }
             }
 
             if isPeekingSidebar {
@@ -64,6 +71,7 @@ struct BrowserWindow: View {
             isPeekingSidebar = false
         }
         .animation(.easeOut(duration: 0.15), value: browser.commandBar)
+        .animation(.snappy(duration: 0.25), value: browser.peek?.id)
         .animation(.snappy, value: browser.toast)
         .animation(.snappy(duration: 0.2), value: browser.isFindBarVisible)
         .onAppear(perform: installShortcutMonitor)
@@ -144,7 +152,7 @@ struct BrowserWindow: View {
 
     /// Prompts and the find bar belong to the focused pane.
     @ViewBuilder private func page(for tab: Tab) -> some View {
-        let isFocused = tab.id == browser.activeTabID
+        let isFocused = tab.id == browser.activeTabID && browser.peek == nil
         if tab.internalPage == .history {
             HistoryPage(tab: tab)
                 .id(tab.id)
@@ -196,6 +204,41 @@ struct BrowserWindow: View {
             .animation(.easeOut(duration: 0.12), value: tab.hoveredLink == nil)
     }
 
+    /// A link previewed in a card over the dimmed page, like Arc's Peek. Clicking beside it or
+    /// pressing Esc closes it, shrinking it away. Expanding skips that: it moves the web view into
+    /// a pane, which a still-visible card would take back.
+    private func peekOverlay(_ tab: Tab) -> some View {
+        ZStack {
+            Color.black.opacity(0.22)
+                .clipShape(RoundedRectangle(cornerRadius: Theme.contentCornerRadius, style: .continuous))
+                .onTapGesture(perform: browser.closePeek)
+            card { webPage(for: tab, isFocused: true) }
+                .shadow(color: .black.opacity(0.3), radius: 24, y: 8)
+                .overlay(alignment: .topTrailing) {
+                    PeekControls(expand: expandPeek)
+                        .offset(x: PeekControls.width + 10)
+                }
+                .padding(.horizontal, PeekControls.width + 26)
+                .padding(.vertical, 24)
+        }
+        .padding(.vertical, Theme.contentInset)
+        .padding(.trailing, Theme.contentInset)
+        .transition(isExpandingPeek ? .asymmetric(insertion: peekTransition, removal: .identity) : peekTransition)
+    }
+
+    private var peekTransition: AnyTransition {
+        reduceMotion ? .opacity : .scale(scale: 0.94).combined(with: .opacity)
+    }
+
+    /// A view leaves with the transition it had in the update before its removal, hence the extra turn.
+    private func expandPeek(intoSplitView: Bool) {
+        isExpandingPeek = true
+        DispatchQueue.main.async {
+            browser.expandPeek(intoSplitView: intoSplitView)
+            isExpandingPeek = false
+        }
+    }
+
     /// Hovering the collapsed rail slides the full sidebar in over the page, like Arc.
     private var sidebarPeek: some View {
         SidebarView()
@@ -235,6 +278,12 @@ struct BrowserWindow: View {
             }
             if modifiers == .control, let number = event.charactersIgnoringModifiers.flatMap(Int.init), (1...9).contains(number) {
                 browser.selectSpace(number: number)
+                return nil
+            }
+            // Esc closes Peek, unless the command bar or find bar is open and takes it.
+            if event.keyCode == 53, modifiers.isEmpty, browser.peek != nil,
+               browser.commandBar == nil, !browser.isFindBarVisible {
+                browser.closePeek()
                 return nil
             }
             if modifiers == .command, event.charactersIgnoringModifiers == "w" {
@@ -316,6 +365,48 @@ private struct ToastView: View {
 
     private var shape: RoundedRectangle {
         RoundedRectangle(cornerRadius: 12, style: .continuous)
+    }
+}
+
+/// Beside the Peek card, like Arc's: close it, or keep the page as a tab or in a split view.
+private struct PeekControls: View {
+    static let width: CGFloat = 30
+    @Environment(Browser.self) private var browser
+    /// Keeps the page as a tab, in a split view when `true`.
+    let expand: (Bool) -> Void
+
+    var body: some View {
+        VStack(spacing: 8) {
+            button("Close", systemImage: "xmark", help: "Close (Esc)") { browser.closePeek() }
+            button("Open as Tab", systemImage: "arrow.up.left.and.arrow.down.right", help: "Open as Tab") {
+                expand(false)
+            }
+            if browser.canExpandPeekIntoSplitView {
+                button("Open in Split View", systemImage: "rectangle.split.2x1", help: "Open in Split View") {
+                    expand(true)
+                }
+            }
+        }
+    }
+
+    private func button(
+        _ label: String,
+        systemImage: String,
+        help: String,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button(action: action) {
+            Image(systemName: systemImage)
+                .font(.system(size: 12, weight: .semibold))
+                .frame(width: Self.width, height: Self.width)
+                .background(.regularMaterial, in: Circle())
+                .overlay(Circle().strokeBorder(.primary.opacity(0.1)))
+                .shadow(color: .black.opacity(0.18), radius: 4, y: 1)
+                .contentShape(Circle())
+        }
+        .buttonStyle(.plain)
+        .help(help)
+        .accessibilityLabel(label)
     }
 }
 

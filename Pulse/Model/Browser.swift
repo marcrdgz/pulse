@@ -58,6 +58,8 @@ final class Browser: NSObject {
     var isDownloadsBubblePresented = false
     /// Sites waiting for a camera/microphone answer, oldest first.
     private(set) var permissionRequests: [PermissionRequest] = []
+    /// A link previewed over the page, like Arc's Peek; one of the space's tabs only once expanded.
+    private(set) var peek: Tab?
     private var closedTabs: [ClosedTab] = []
 
     /// Private windows keep cookies and storage in memory and record no history or session.
@@ -159,6 +161,9 @@ final class Browser: NSObject {
         allTabs.first { $0.id == activeTabID }
     }
 
+    /// The page keyboard input and page commands go to: Peek while it's open, the active tab otherwise.
+    var focusedTab: Tab? { peek ?? activeTab }
+
     var canReopenClosedTab: Bool { !closedTabs.isEmpty }
 
     /// Most recently closed first, for the History menu.
@@ -195,6 +200,62 @@ final class Browser: NSObject {
         let tab = openTab(url: URL(string: "about:blank")!)
         tab.opener = opener
         return tab.adoptWebView(configuration: configuration)
+    }
+
+    // MARK: Peek
+
+    /// Like Arc: ⇧-clicked links open in Peek, and so do links from a pinned tab or favorite to
+    /// another site, so the pinned page stays where it was. `leavesPage` is false for links
+    /// navigating a frame inside the page.
+    func opensInPeek(_ url: URL, clickedIn tab: Tab, target: LinkTarget, leavesPage: Bool) -> Bool {
+        guard tab !== peek, url.isWebPage else { return false }
+        switch target {
+        case .peek: return true
+        case .newTab: return false
+        case .asRequested:
+            return leavesPage && tab.isPinned && preferences.opensPinnedLinksInPeek && !url.isSameSite(as: tab.url)
+        }
+    }
+
+    /// Replaces the page already peeking, if any.
+    func openPeek(_ url: URL, from opener: Tab) {
+        closePeek()
+        let tab = makeTab(url: url)
+        tab.opener = opener
+        isFindBarVisible = false
+        peek = tab
+    }
+
+    func closePeek() {
+        guard let tab = peek else { return }
+        peek = nil
+        isFindBarVisible = false
+        denyPermissionRequests(from: tab)
+        // The card shrinks away showing the page; unloading at once would blank it first.
+        Task {
+            try? await Task.sleep(for: .milliseconds(400))
+            tab.unload()
+        }
+    }
+
+    /// Splitting needs the page it came from to belong to a space: favorites are shared by every space.
+    var canExpandPeekIntoSplitView: Bool {
+        peek?.opener.flatMap(space(containing:)) != nil
+    }
+
+    /// Keeps the peeked page as a today tab, beside the page it came from when `intoSplitView`.
+    func expandPeek(intoSplitView: Bool = false) {
+        guard let tab = peek else { return }
+        peek = nil
+        let opener = tab.opener
+        let space = opener.flatMap(space(containing:)) ?? activeSpace
+        space.todayTabs.insert(tab, at: 0)
+        extensions?.controller.didOpenTab(tab)
+        if intoSplitView, let opener, canSplit(opener, with: tab) {
+            splitView(opener, with: tab)
+        } else {
+            select(tab)
+        }
     }
 
     // MARK: Split view
@@ -267,7 +328,10 @@ final class Browser: NSObject {
         if let tab, let owner = space(containing: tab), owner.id != activeSpaceID {
             activeSpaceID = owner.id
         }
-        if tab?.id != activeTabID { isFindBarVisible = false }
+        if tab?.id != activeTabID {
+            isFindBarVisible = false
+            closePeek()
+        }
         activeSpace.activeTabID = tab?.id
         activeTabDidChange(from: previous)
         scheduleSave()
@@ -298,6 +362,11 @@ final class Browser: NSObject {
 
     /// Favorites and pinned tabs are never removed: closing one resets it to its pinned page, like Arc.
     func close(_ tab: Tab) {
+        if tab === peek {
+            closePeek()
+            return
+        }
+        if tab === peek?.opener { closePeek() }
         let previous = activeTab
         denyPermissionRequests(from: tab)
         // Closing one pane of a split view leaves the other on screen, like Arc.
@@ -554,7 +623,7 @@ final class Browser: NSObject {
 
     /// The prompt to show: the oldest request from the visible tab.
     var activePermissionRequest: PermissionRequest? {
-        permissionRequests.first { $0.tabID == activeTabID }
+        permissionRequests.first { $0.tabID == focusedTab?.id }
     }
 
     /// Answers at once when the user already decided for this site, otherwise queues a prompt.
@@ -601,8 +670,9 @@ final class Browser: NSObject {
         pending.forEach { $0.respond(.deny) }
     }
 
+    /// ⌘W closes Peek first, like Arc.
     func closeActiveTab() {
-        if let activeTab { close(activeTab) }
+        if let tab = focusedTab { close(tab) }
     }
 
     /// Reopens into the space the tab was closed from, if it still exists.
@@ -769,6 +839,7 @@ final class Browser: NSObject {
         guard space.id != activeSpaceID, spaces.contains(where: { $0.id == space.id }) else { return }
         let previous = activeTab
         previous?.wasShown(at: .now)
+        closePeek()
         activeSpaceID = space.id
         isFindBarVisible = false
         commandBar = nil
@@ -843,6 +914,7 @@ final class Browser: NSObject {
             tab.unload()
         }
         if activeSpaceID == space.id {
+            closePeek()
             activeSpaceID = spaces[min(index, spaces.count - 1)].id
             isFindBarVisible = false
         }
@@ -905,7 +977,7 @@ final class Browser: NSObject {
     // MARK: Find
 
     func showFindBar() {
-        guard activeTab != nil else { return }
+        guard focusedTab != nil else { return }
         isFindBarVisible = true
         findBarActivation += 1
     }
@@ -913,11 +985,11 @@ final class Browser: NSObject {
     func hideFindBar() {
         isFindBarVisible = false
         isFindQueryMissing = false
-        activeTab?.clearFindSelection()
+        focusedTab?.clearFindSelection()
     }
 
     func findInPage(backwards: Bool = false) {
-        guard let tab = activeTab, !findQuery.isEmpty else {
+        guard let tab = focusedTab, !findQuery.isEmpty else {
             isFindQueryMissing = false
             return
         }

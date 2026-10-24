@@ -12,6 +12,8 @@ struct BrowserCommands: Commands {
     private var browser: Browser { focusedBrowser ?? mainBrowser }
 
     private var activeTab: Tab? { browser.activeTab }
+    /// Page commands (reload, zoom, back…) act on Peek while it's open.
+    private var pageTab: Tab? { browser.focusedTab }
 
     /// The last pages visited, one entry per URL, like Chrome's History menu.
     private var recentlyVisited: [HistoryVisit] {
@@ -39,7 +41,7 @@ struct BrowserCommands: Commands {
                 .keyboardShortcut("l")
             Divider()
             // Replacing the system "Close" item also took ⌘W from Settings and other windows.
-            Button(activeTab?.isPinned == true ? "Reset Pinned Tab" : "Close Tab") {
+            Button(browser.peek != nil ? "Close Peek" : activeTab?.isPinned == true ? "Reset Pinned Tab" : "Close Tab") {
                 if let focusedBrowser {
                     focusedBrowser.closeActiveTab()
                 } else {
@@ -91,28 +93,28 @@ struct BrowserCommands: Commands {
 
         CommandGroup(after: .sidebar) {
             Divider()
-            Button("Reload Page") { activeTab?.reload() }
+            Button("Reload Page") { pageTab?.reload() }
                 .keyboardShortcut("r")
-                .disabled(activeTab == nil)
-            Button("Reload Page Ignoring Cache") { activeTab?.reload(ignoringCache: true) }
+                .disabled(pageTab == nil)
+            Button("Reload Page Ignoring Cache") { pageTab?.reload(ignoringCache: true) }
                 .keyboardShortcut("r", modifiers: [.command, .shift])
-                .disabled(activeTab == nil)
+                .disabled(pageTab == nil)
             Divider()
-            Button("Actual Size") { activeTab?.resetZoom() }
+            Button("Actual Size") { pageTab?.resetZoom() }
                 .keyboardShortcut("0")
-            Button("Zoom In") { activeTab?.zoomIn() }
+            Button("Zoom In") { pageTab?.zoomIn() }
                 .keyboardShortcut("=")
-            Button("Zoom Out") { activeTab?.zoomOut() }
+            Button("Zoom Out") { pageTab?.zoomOut() }
                 .keyboardShortcut("-")
         }
 
         CommandMenu("History") {
-            Button("Back") { activeTab?.goBack() }
+            Button("Back") { pageTab?.goBack() }
                 .keyboardShortcut("[")
-                .disabled(!(activeTab?.canGoBack ?? false))
-            Button("Forward") { activeTab?.goForward() }
+                .disabled(!(pageTab?.canGoBack ?? false))
+            Button("Forward") { pageTab?.goForward() }
                 .keyboardShortcut("]")
-                .disabled(!(activeTab?.canGoForward ?? false))
+                .disabled(!(pageTab?.canGoForward ?? false))
             Divider()
             Button("Show Full History", action: browser.showHistory)
                 .keyboardShortcut("y")
@@ -146,13 +148,13 @@ struct BrowserCommands: Commands {
             .keyboardShortcut("d")
             .disabled(activeTab == nil)
             Button("Copy URL") {
-                if let activeTab { browser.copyURL(of: activeTab) }
+                if let pageTab { browser.copyURL(of: pageTab) }
             }
             .keyboardShortcut("c", modifiers: [.command, .shift])
-            .disabled(activeTab == nil)
-            Button(activeTab?.isMuted == true ? "Unmute Tab" : "Mute Tab") { activeTab?.toggleMuted() }
+            .disabled(pageTab == nil)
+            Button(pageTab?.isMuted == true ? "Unmute Tab" : "Mute Tab") { pageTab?.toggleMuted() }
                 .keyboardShortcut("m", modifiers: .control)
-                .disabled(activeTab == nil)
+                .disabled(pageTab == nil)
             if let activeTab, browser.activeSplit != nil {
                 Button("Separate Split View") { browser.separate(activeTab) }
                     .keyboardShortcut("=", modifiers: [.control, .shift])
@@ -197,9 +199,9 @@ struct BrowserCommands: Commands {
         }
 
         CommandMenu("Develop") {
-            Button("Web Inspector") { activeTab?.showWebInspector() }
+            Button("Web Inspector") { pageTab?.showWebInspector() }
                 .keyboardShortcut("i", modifiers: [.command, .option])
-                .disabled(activeTab == nil)
+                .disabled(pageTab == nil)
         }
     }
 }

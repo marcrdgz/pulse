@@ -14,6 +14,9 @@ A native macOS browser built on WebKit, with Arc's look and keyboard-first workf
 - Split view like Arc's: drag a tab from the sidebar onto either half of the page, press ⌃⇧= to open a
   page next to the current tab, or right-click a tab › Open in Split View. The pair is one sidebar row, drag the gap between pages to resize them, and the split
   is saved with the session.
+- Peek like Arc's: ⇧-click a link, or follow one from a pinned tab or favorite to another site, and it
+  opens in a card over the page. Esc or a click beside it closes it; its buttons keep it as a tab or
+  open it in split view next to the pinned page.
 - Inset rounded web content, collapsible sidebar that peeks in from the left edge.
 - Drag tabs to reorder them, or between Favorites, Pinned and Today; resize the sidebar by its edge.
 - Double-click a tab to rename it; middle-click to close it.
