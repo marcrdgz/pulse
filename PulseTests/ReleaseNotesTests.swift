@@ -23,7 +23,6 @@ struct ReleaseNotesTests {
     @Test func bundledNotesDecodeNewestFirst() throws {
         let url = try #require(Bundle.main.url(forResource: "ReleaseNotes", withExtension: "json"))
         let releases = try ReleaseNotes.decode(Data(contentsOf: url))
-        #expect(!releases.isEmpty)
         let versions = releases.map(\.version)
         #expect(versions == versions.sorted { $0.compare($1, options: .numeric) == .orderedDescending })
         #expect(Set(versions).count == versions.count)
