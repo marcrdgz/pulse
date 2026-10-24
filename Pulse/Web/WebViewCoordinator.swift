@@ -162,6 +162,13 @@ final class WebViewCoordinator: NSObject, WKNavigationDelegate, WKUIDelegate {
         if let tab { tab.browser?.close(tab) }
     }
 
+    /// WebKit SPI that Safari implements. Without it pages see `outerWidth` and `outerHeight` as 0,
+    /// which bot checks (the Apple Store's sign-in among them) take for a headless browser.
+    @objc(_webView:getWindowFrameWithCompletionHandler:)
+    func webView(_ webView: WKWebView, getWindowFrame completionHandler: @escaping (CGRect) -> Void) {
+        completionHandler(webView.window?.frame ?? .zero)
+    }
+
     func webView(
         _ webView: WKWebView,
         runJavaScriptAlertPanelWithMessage message: String,
