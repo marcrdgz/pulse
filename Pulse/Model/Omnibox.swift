@@ -67,7 +67,9 @@ enum Omnibox {
 
         var suggestions: [OmniboxSuggestion] = []
         var inlineCompletion: String?
-        if allowsInlineCompletion, !needle.contains(" "),
+        // Any whitespace, even trailing, means the user is typing a query, and the completion
+        // must start with exactly what was typed or it would swallow the space.
+        if allowsInlineCompletion, !input.contains(where: \.isWhitespace),
            let best = ranked.first(where: { isFrequent($0) && $0.url.omniboxText.hasPrefix(needle) }) {
             let (fill, url) = completion(of: best, for: needle)
             inlineCompletion = text + fill.dropFirst(needle.count)

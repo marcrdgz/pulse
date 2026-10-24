@@ -39,6 +39,7 @@ struct OmniboxTests {
         let frequent = [entry("https://github.com/", visits: 5)]
         #expect(result("git", frequent, inline: false).inlineCompletion == nil)
         #expect(result("git hub", frequent).inlineCompletion == nil)
+        #expect(result("git ", frequent).inlineCompletion == nil)
     }
 
     @Test func typedAndRecentSitesRankFirst() {
