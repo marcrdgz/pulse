@@ -361,6 +361,14 @@ final class Tab: NSObject, Identifiable {
         loadedWebView?.pageZoom = min(max(zoom, 0.3), 3)
     }
 
+    /// Safari's token with the version of the Safari installed alongside this WebKit, so sites see
+    /// the engine they actually get rather than an older one.
+    static let safariUserAgentToken: String = {
+        let safari = Bundle(url: URL(filePath: "/Applications/Safari.app"))
+        let version = safari?.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String
+        return "Version/\(version ?? "26.0") Safari/605.1.15"
+    }()
+
     private func makeConfiguration() -> WKWebViewConfiguration {
         let extensions = browser?.extensions
         // An extension's own pages (its options, say) only load with the configuration WebKit made for them.
@@ -368,7 +376,7 @@ final class Tab: NSObject, Identifiable {
         configuration.webExtensionController = extensions?.controller
         configuration.websiteDataStore = browser?.websiteDataStore ?? .default()
         // Without a Safari token some sites (e.g. Google) serve degraded markup to WKWebView.
-        configuration.applicationNameForUserAgent = "Version/26.0 Safari/605.1.15"
+        configuration.applicationNameForUserAgent = Self.safariUserAgentToken
         // HTTPS first, like Safari: http pages load over https when the server supports it.
         configuration.defaultWebpagePreferences.preferredHTTPSNavigationPolicy = .automaticFallbackToHTTP
         configuration.preferences.isElementFullscreenEnabled = true

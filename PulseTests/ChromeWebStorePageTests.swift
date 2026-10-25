@@ -67,6 +67,10 @@ struct ChromeWebStorePageTests {
 
         #expect(try await run("typeof window.chrome?.webstorePrivate", in: tab) as? String == "undefined")
         #expect(try await run("navigator.userAgent.includes('Chrome/')", in: tab) as? Bool == false)
+        // Claims the installed Safari, so the sandboxed app must be able to read its version.
+        let safari = try #require(Bundle(url: URL(filePath: "/Applications/Safari.app")))
+        let version = try #require(safari.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String)
+        #expect((try await run("navigator.userAgent", in: tab) as? String)?.hasSuffix("Version/\(version) Safari/605.1.15") == true)
         #expect(ChromeWebStorePage.userAgent(forPageAt: URL(string: "https://example.com")!) == nil)
     }
 
