@@ -8,6 +8,9 @@ enum Theme {
     static let contentInset: CGFloat = 8
     static let contentCornerRadius: CGFloat = 10
     static let rowCornerRadius: CGFloat = 8
+    static let tabRowHeight: CGFloat = 34
+    static let tileHeight: CGFloat = 44
+    static let tileCornerRadius: CGFloat = 10
     /// Arc's bottom-bar targets are larger than the toolbar's.
     static let bottomBarButtonSize: CGFloat = 30
 

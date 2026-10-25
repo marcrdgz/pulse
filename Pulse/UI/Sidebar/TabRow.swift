@@ -64,7 +64,7 @@ struct TabRow: View {
         .font(.system(size: 13, weight: isActive ? .medium : .regular))
         .padding(.leading, 10)
         .padding(.trailing, 4)
-        .frame(height: 34)
+        .frame(height: Theme.tabRowHeight)
         .background { background }
         .contentShape(Rectangle())
         .onHover { isHovered = $0 }
@@ -127,7 +127,7 @@ struct SplitRow: View {
                 .frame(width: 1, height: 16)
             half(trailing)
         }
-        .frame(height: 34)
+        .frame(height: Theme.tabRowHeight)
         .background { background }
         .onHover { isHovered = $0 }
         .accessibilityElement(children: .contain)

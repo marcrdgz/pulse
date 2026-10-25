@@ -76,4 +76,71 @@ struct SidebarDragTests {
 
         #expect(drag.hoveredSpaceID == nil)
     }
+
+    /// A pinned tab above the today tab, with the list showing both.
+    private func layOutPinned() -> (pinned: Tab, today: Tab) {
+        let (_, _, today) = layOut()
+        let pinned = browser.openTab(url: URL(string: "https://p.com")!)
+        browser.togglePin(pinned)
+        drag.tabFrames[pinned.id] = CGRect(x: 0, y: 50, width: 200, height: 34)
+        drag.pinnedAreaFrame = CGRect(x: 0, y: 50, width: 200, height: 34)
+        drag.scrollViewportFrame = CGRect(x: 0, y: 40, width: 200, height: 540)
+        return (pinned, today)
+    }
+
+    /// The slot shows where the tab lands, and the drop puts it there.
+    @Test func draggingIntoAnotherSectionOpensASlotWhereItLands() {
+        let (pinned, today) = layOutPinned()
+
+        drag.drag(today, to: CGPoint(x: 50, y: 110), in: browser)
+        drag.drag(today, to: CGPoint(x: 50, y: 55), in: browser)
+        #expect(drag.pendingDestination == TabPosition(section: .pinned, index: 0))
+        #expect(drag.items(browser.pinnedTabs, in: .pinned).map(\.id) == [.slot, .tab(pinned.id)])
+        drag.drop(today, at: CGPoint(x: 50, y: 55), in: browser)
+
+        #expect(browser.pinnedTabs.map(\.id) == [today.id, pinned.id])
+        #expect(drag.pendingDestination == nil)
+    }
+
+    /// Scrolled out of the list, pinned rows sit under the space's name, which mustn't take drops.
+    @Test func pinnedRowsScrolledOutOfViewTakeNoDrop() {
+        let (pinned, today) = layOutPinned()
+        drag.scrollViewportFrame = CGRect(x: 0, y: 90, width: 200, height: 490)
+
+        drag.drag(today, to: CGPoint(x: 50, y: 110), in: browser)
+        drag.drag(today, to: CGPoint(x: 50, y: 70), in: browser)
+        #expect(drag.pendingDestination == nil)
+        drag.drop(today, at: CGPoint(x: 50, y: 70), in: browser)
+
+        #expect(browser.pinnedTabs.map(\.id) == [pinned.id])
+    }
+
+    @Test func restingNearTheListsEdgeScrollsItThatWay() {
+        let (home, _, tab) = layOut()
+        drag.scrollViewportFrame = CGRect(x: 0, y: 40, width: 200, height: 540)
+        drag.listScrollRanges[home.id] = ListScrollRange(offset: 100, maxOffset: 300)
+
+        drag.drag(tab, to: CGPoint(x: 50, y: 575), in: browser)
+        #expect(drag.isAutoscrolling)
+        let down = drag.autoscroll(by: 0.1, in: browser)
+        #expect(down.map { $0 > 100 } == true)
+
+        drag.drag(tab, to: CGPoint(x: 50, y: 45), in: browser)
+        let up = drag.autoscroll(by: 0.1, in: browser)
+        #expect(up.map { $0 < down! } == true)
+
+        drag.drag(tab, to: CGPoint(x: 50, y: 300), in: browser)
+        #expect(!drag.isAutoscrolling)
+        #expect(drag.autoscroll(by: 0.1, in: browser) == nil)
+    }
+
+    @Test func autoscrollStopsAtTheTopOfTheList() {
+        let (home, _, tab) = layOut()
+        drag.scrollViewportFrame = CGRect(x: 0, y: 40, width: 200, height: 540)
+        drag.listScrollRanges[home.id] = ListScrollRange(offset: 0, maxOffset: 300)
+
+        drag.drag(tab, to: CGPoint(x: 50, y: 45), in: browser)
+
+        #expect(drag.autoscroll(by: 0.1, in: browser) == nil)
+    }
 }

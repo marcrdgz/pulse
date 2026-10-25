@@ -11,6 +11,7 @@ struct SpaceContent: View {
     let isActive: Bool
     /// Per space: matched geometry ids must be unique among the views on screen.
     @Namespace private var activeHighlight
+    @State private var scrollPosition = ScrollPosition()
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
@@ -27,8 +28,29 @@ struct SpaceContent: View {
                 }
             }
             .scrollIndicators(.never)
+            .scrollPosition($scrollPosition)
             .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { frame in
                 if isActive { dragController.scrollViewportFrame = frame }
+            }
+            .onScrollGeometryChange(for: ListScrollRange.self) { geometry in
+                ListScrollRange(
+                    offset: geometry.contentOffset.y,
+                    maxOffset: max(0, geometry.contentSize.height - geometry.containerSize.height)
+                )
+            } action: { _, range in
+                dragController.listScrollRanges[space.id] = range
+            }
+            .task(id: isActive && dragController.isAutoscrolling) {
+                guard isActive, dragController.isAutoscrolling else { return }
+                var lastStep = ContinuousClock.now
+                while !Task.isCancelled {
+                    try? await Task.sleep(for: .milliseconds(16))
+                    let now = ContinuousClock.now
+                    if let offset = dragController.autoscroll(by: (now - lastStep) / .seconds(1), in: browser) {
+                        scrollPosition.scrollTo(y: offset)
+                    }
+                    lastStep = now
+                }
             }
         }
         .animation(.snappy(duration: 0.2), value: space.activeTabID)
@@ -40,14 +62,10 @@ struct SpaceContent: View {
             if showsDropZone {
                 SidebarDropZone(title: "Drop here to pin", isTargeted: dragController.pendingSection == .pinned)
             }
-            ForEach(space.pinnedTabs) { tab in
-                row(for: tab)
+            ForEach(showsDropZone ? space.pinnedTabs.map(SidebarDragItem.tab) : items(space.pinnedTabs, in: .pinned)) { item in
+                row(for: item)
             }
         }
-        .background(
-            RoundedRectangle(cornerRadius: Theme.rowCornerRadius, style: .continuous)
-                .fill(isActive && dragController.pendingSection == .pinned && !showsDropZone ? Theme.hoverFill : .clear)
-        )
         .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { frame in
             // An empty section without a drop zone has no height and must not catch drops.
             if isActive { dragController.pinnedAreaFrame = frame.height > 0 ? frame : nil }
@@ -57,19 +75,27 @@ struct SpaceContent: View {
 
     private var todaySection: some View {
         VStack(spacing: 2) {
-            ForEach(space.todayTabs) { tab in
-                row(for: tab)
+            ForEach(items(space.todayTabs, in: .today)) { item in
+                row(for: item)
             }
         }
         .frame(maxWidth: .infinity, minHeight: isActive && dragController.isDragging ? 44 : 0, alignment: .top)
-        .background(
-            RoundedRectangle(cornerRadius: Theme.rowCornerRadius, style: .continuous)
-                .fill(isActive && dragController.pendingSection == .today ? Theme.hoverFill : .clear)
-        )
         .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { frame in
             if isActive { dragController.todayAreaFrame = frame }
         }
         .animation(.snappy(duration: 0.22), value: space.todayTabs.map(\.id))
+    }
+
+    /// Only the visible space opens a slot for a tab dragged in from another section.
+    private func items(_ tabs: [Tab], in section: TabSection) -> [SidebarDragItem] {
+        isActive ? dragController.items(tabs, in: section) : tabs.map(SidebarDragItem.tab)
+    }
+
+    @ViewBuilder private func row(for item: SidebarDragItem) -> some View {
+        switch item {
+        case .tab(let tab): row(for: tab)
+        case .slot: SidebarDropSlot(isTile: false)
+        }
     }
 
     /// A split view is one row in its leading tab's place; its trailing tab has none of its own.

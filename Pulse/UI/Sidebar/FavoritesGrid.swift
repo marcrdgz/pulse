@@ -14,25 +14,15 @@ struct FavoritesGrid: View {
                 SidebarDropZone(title: "Drop here to add to Favorites", isTargeted: isDropTarget)
             } else {
                 LazyVGrid(columns: [GridItem(.adaptive(minimum: 48), spacing: 6)], spacing: 6) {
-                    ForEach(browser.favorites) { tab in
-                        FavoriteTile(tab: tab, isActive: tab.id == browser.activeTabID)
-                            .onTapGesture { browser.select(tab) }
-                            .accessibilityElement(children: .ignore)
-                            .accessibilityLabel(tab.displayTitle)
-                            .accessibilityValue(tab.mediaDescription ?? "")
-                            .accessibilityAddTraits(tab.id == browser.activeTabID ? [.isButton, .isSelected] : .isButton)
-                            .accessibilityAction { browser.select(tab) }
-                            .contextMenu { TabContextMenu(tab: tab) }
-                            .sidebarDraggable(tab)
-                            .transition(.scale(scale: 0.8).combined(with: .opacity))
+                    ForEach(dragController.items(browser.favorites, in: .favorites)) { item in
+                        switch item {
+                        case .tab(let tab): tile(for: tab)
+                        case .slot: SidebarDropSlot(isTile: true)
+                        }
                     }
                 }
-                .background(
-                    RoundedRectangle(cornerRadius: 10, style: .continuous)
-                        .fill(isDropTarget ? Theme.hoverFill : .clear)
-                )
                 .overlay(
-                    RoundedRectangle(cornerRadius: 10, style: .continuous)
+                    RoundedRectangle(cornerRadius: Theme.tileCornerRadius, style: .continuous)
                         .strokeBorder(style: StrokeStyle(lineWidth: 1.5, dash: [5, 4]))
                         .opacity(isDropTarget ? 0.45 : 0)
                 )
@@ -45,6 +35,19 @@ struct FavoritesGrid: View {
         .animation(.snappy(duration: 0.22), value: browser.favorites.map(\.id))
         .animation(.snappy(duration: 0.15), value: isDropTarget)
     }
+
+    private func tile(for tab: Tab) -> some View {
+        FavoriteTile(tab: tab, isActive: tab.id == browser.activeTabID)
+            .onTapGesture { browser.select(tab) }
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel(tab.displayTitle)
+            .accessibilityValue(tab.mediaDescription ?? "")
+            .accessibilityAddTraits(tab.id == browser.activeTabID ? [.isButton, .isSelected] : .isButton)
+            .accessibilityAction { browser.select(tab) }
+            .contextMenu { TabContextMenu(tab: tab) }
+            .sidebarDraggable(tab)
+            .transition(.scale(scale: 0.8).combined(with: .opacity))
+    }
 }
 
 private struct FavoriteTile: View {
@@ -54,14 +57,14 @@ private struct FavoriteTile: View {
 
     var body: some View {
         FaviconView(tab: tab, size: 18)
-            .frame(maxWidth: .infinity, minHeight: 44)
+            .frame(maxWidth: .infinity, minHeight: Theme.tileHeight)
             .overlay(alignment: .topTrailing) {
                 MediaCaptureIndicator(tab: tab)
                     .font(.system(size: 8, weight: .semibold))
                     .padding(5)
             }
             .background(
-                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                RoundedRectangle(cornerRadius: Theme.tileCornerRadius, style: .continuous)
                     .fill(isActive || isHovered ? Theme.activeTabFill : Theme.pillFill)
                     .shadow(color: .black.opacity(isActive ? 0.08 : 0), radius: 1, y: 1)
             )
