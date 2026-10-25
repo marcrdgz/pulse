@@ -70,6 +70,9 @@ struct BrowserWindow: View {
             peekTask?.cancel()
             isPeekingSidebar = false
         }
+        .onChange(of: browser.commandBar) { _, mode in
+            if mode == nil { focusPageAfterCommandBar() }
+        }
         .animation(.easeOut(duration: 0.15), value: browser.commandBar)
         .animation(.snappy(duration: 0.25), value: browser.peek?.id)
         .animation(.snappy, value: browser.toast)
@@ -291,6 +294,18 @@ struct BrowserWindow: View {
                 return nil
             }
             return event
+        }
+    }
+
+    /// `WebView` only takes focus when a page is first shown, so closing the bar over the same page
+    /// (Esc, or a URL loaded in place) would otherwise leave keys going nowhere until a click.
+    /// Waits a runloop so a tab the bar just opened is in the window first.
+    private func focusPageAfterCommandBar() {
+        DispatchQueue.main.async {
+            guard browser.commandBar == nil, let window = browser.window,
+                  let webView = browser.focusedTab?.loadedWebView, webView.window === window
+            else { return }
+            window.makeFirstResponder(webView)
         }
     }
 
