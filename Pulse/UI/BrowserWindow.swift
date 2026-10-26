@@ -13,8 +13,8 @@ struct BrowserWindow: View {
     @State private var dragController = SidebarDragController()
     /// Shared by the sidebar, which the swipe drags, and the window background, whose color follows it.
     @State private var swipeTracker = SpaceSwipeTracker()
-    /// The panes of the split last on screen, to tell a split closing from a switch to another tab.
-    @State private var lastSplitTabIDs: Set<UUID> = []
+    /// The side a split view pane just closed on, fading out over the pane that took its place.
+    @State private var closedPaneSide: ClosedPaneSide?
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
@@ -118,7 +118,6 @@ struct BrowserWindow: View {
                         page(for: tab)
                     }
                     .frame(width: isLeadingPane ? available * (split?.ratio ?? 0.5) : nil)
-                    .transition(.opacity.combined(with: .scale(scale: 0.96)))
                     .overlay(alignment: .trailing) {
                         if isLeadingPane {
                             SplitDivider(available: available)
@@ -138,13 +137,15 @@ struct BrowserWindow: View {
             SplitDropPreview()
                 .environment(dragController)
         }
-        // Closing or separating a pane lets the other grow into its place; switching tabs stays instant.
-        .animation(
-            tabs.contains { lastSplitTabIDs.contains($0.id) } ? .snappy(duration: 0.28) : nil,
-            value: tabs.map(\.id)
-        )
-        .onChange(of: split.map { [$0.leading, $0.trailing] }, initial: true) { _, ids in
-            lastSplitTabIDs = Set(ids ?? [])
+        .overlay {
+            if let closedPaneSide {
+                ClosedPaneFade(closed: closedPaneSide) { self.closedPaneSide = nil }
+                    .id(closedPaneSide.id)
+            }
+        }
+        .onChange(of: split) { old, new in
+            guard let old, new == nil, tabs.count == 1, let kept = tabs.first?.id, old.contains(kept) else { return }
+            closedPaneSide = ClosedPaneSide(side: kept == old.leading ? .trailing : .leading, ratio: old.ratio)
         }
         .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { dragController.contentFrame = $0 }
         .padding(.vertical, Theme.contentInset)
@@ -567,6 +568,41 @@ private struct SplitDropCard: View {
         .scaleEffect(isSettled || reduceMotion ? 1 : 0.9)
         .onAppear {
             withAnimation(.spring(response: 0.38, dampingFraction: 0.68)) { isSettled = true }
+        }
+    }
+}
+
+/// Where a split view pane closed, and how wide it was.
+private struct ClosedPaneSide: Equatable {
+    let id = UUID()
+    let side: SplitSide
+    /// The leading pane's share of the width.
+    let ratio: Double
+}
+
+/// A blank card over the place a closed pane left, fading away to uncover the page that took it.
+/// The remaining page jumps to its new width at once: animating it would make the web view lay
+/// its page out again on every frame, which stutters.
+private struct ClosedPaneFade: View {
+    let closed: ClosedPaneSide
+    let onFinish: () -> Void
+    @State private var isFaded = false
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    var body: some View {
+        GeometryReader { proxy in
+            let available = proxy.size.width - Theme.contentInset
+            let share = closed.side == .leading ? closed.ratio : 1 - closed.ratio
+            RoundedRectangle(cornerRadius: Theme.contentCornerRadius, style: .continuous)
+                .fill(Color(nsColor: .windowBackgroundColor))
+                .frame(width: available * share)
+                .scaleEffect(isFaded && !reduceMotion ? 0.96 : 1)
+                .opacity(isFaded ? 0 : 1)
+                .frame(maxWidth: .infinity, alignment: closed.side == .leading ? .leading : .trailing)
+        }
+        .allowsHitTesting(false)
+        .onAppear {
+            withAnimation(.easeOut(duration: 0.25)) { isFaded = true } completion: { onFinish() }
         }
     }
 }
