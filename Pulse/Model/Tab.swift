@@ -17,6 +17,8 @@ final class Tab: NSObject, Identifiable {
     private(set) var hoveredLink: String?
     private(set) var cameraCaptureState: WKMediaCaptureState = .none
     private(set) var microphoneCaptureState: WKMediaCaptureState = .none
+    /// The page's `theme-color`, else its background, for chrome that blends into it.
+    private(set) var pageColor: NSColor?
     /// Asleep to free memory; showing the tab brings the page back where it was.
     private(set) var isHibernated = false
     /// The page is making sound (or would be, if muted).
@@ -266,6 +268,7 @@ final class Tab: NSObject, Identifiable {
         microphoneCaptureState = .none
         canGoBack = false
         canGoForward = false
+        pageColor = nil
     }
 
     func resetToPinnedURL() {
@@ -313,6 +316,8 @@ final class Tab: NSObject, Identifiable {
             webView.observe(\.canGoForward) { [weak self] _, _ in MainActor.assumeIsolated { self?.syncWithWebView() } },
             webView.observe(\.cameraCaptureState) { [weak self] _, _ in MainActor.assumeIsolated { self?.syncWithWebView() } },
             webView.observe(\.microphoneCaptureState) { [weak self] _, _ in MainActor.assumeIsolated { self?.syncWithWebView() } },
+            webView.observe(\.themeColor) { [weak self] _, _ in MainActor.assumeIsolated { self?.syncWithWebView() } },
+            webView.observe(\.underPageBackgroundColor) { [weak self] _, _ in MainActor.assumeIsolated { self?.syncWithWebView() } },
         ]
         return webView
     }
@@ -353,6 +358,8 @@ final class Tab: NSObject, Identifiable {
         if microphoneCaptureState != webView.microphoneCaptureState {
             microphoneCaptureState = webView.microphoneCaptureState
         }
+        let newPageColor = webView.themeColor ?? webView.underPageBackgroundColor
+        if pageColor != newPageColor { pageColor = newPageColor }
         if didChangePage { browser?.tabDidUpdate() }
         if !changes.isEmpty { browser?.extensions?.controller.didChangeTabProperties(changes, for: self) }
     }

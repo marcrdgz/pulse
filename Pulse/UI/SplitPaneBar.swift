@@ -2,11 +2,19 @@ import SwiftUI
 
 /// A slim bar atop each split view pane, so either page can be navigated, read or closed
 /// without first focusing it. The sidebar's controls only reach the focused pane.
+/// It takes the page's color, like Safari's compact tabs, so it reads as part of the page.
 struct SplitPaneBar: View {
     static let height: CGFloat = 30
     @Environment(Browser.self) private var browser
     let tab: Tab
     let isFocused: Bool
+    @Environment(\.colorScheme) private var colorScheme
+
+    /// `nil` until the page has one, or when it can't be read as a plain opaque color: a
+    /// translucent one would show the card through it and misjudge the page's lightness.
+    private var pageColor: NSColor? {
+        tab.pageColor?.usingColorSpace(.sRGB).flatMap { $0.alphaComponent > 0.9 ? $0 : nil }
+    }
 
     var body: some View {
         HStack(spacing: 2) {
@@ -51,8 +59,10 @@ struct SplitPaneBar: View {
         .animation(.easeOut(duration: 0.15), value: isFocused)
         .padding(.horizontal, 6)
         .frame(height: Self.height)
-        .background(Color(nsColor: .windowBackgroundColor))
-        .overlay(alignment: .bottom) { Divider() }
+        .background(Color(nsColor: pageColor ?? .windowBackgroundColor))
+        // Icons and hover fills follow the page's lightness, not the system appearance.
+        .environment(\.colorScheme, pageColor.map { $0.isDark ? .dark : .light } ?? colorScheme)
+        .animation(.easeOut(duration: 0.2), value: pageColor)
         .simultaneousGesture(TapGesture().onEnded { browser.focusPane(of: tab) })
     }
 
@@ -76,5 +86,12 @@ struct SplitPaneBar: View {
             .padding(.horizontal, 8)
         }
         .help("Edit URL")
+    }
+}
+
+private extension NSColor {
+    /// Relative luminance below the midpoint, in sRGB.
+    var isDark: Bool {
+        0.2126 * redComponent + 0.7152 * greenComponent + 0.0722 * blueComponent < 0.5
     }
 }
