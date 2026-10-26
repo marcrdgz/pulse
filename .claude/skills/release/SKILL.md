@@ -1,12 +1,14 @@
 ---
 name: release
-description: Prepare a Pulse release - pick the next version from the commits since the last tag, draft the What's New notes (and scenes) in Pulse/Resources/ReleaseNotes.json, bump the version, verify, then commit and tag locally. Use when Marc asks to release, cut, tag or ship a version, or to write the What's New / release notes.
+description: Prepare a Pulse release - pick the next version from the commits since the last tag, draft the What's New notes (and scenes) in Pulse/Resources/ReleaseNotes.json, bump the version, verify, commit and tag locally, then build the signed, notarized DMG. Use when Marc asks to release, cut, tag or ship a version, or to write the What's New / release notes.
 ---
 
 # Release Pulse
 
-Prepares everything up to a local tag. Pushing the tag publishes the release, so **never push**:
-end by printing the push command for Marc.
+Prepares everything up to a local tag and a notarized DMG. Publishing is Marc's: **never push or
+create the GitHub release**; end by printing the commands for him. Pushing `main` deploys the site,
+whose release notes page reads `ReleaseNotes.json`, so the DMG must be on GitHub before `main` is
+pushed, or the site announces a version nobody can download.
 
 ## 1. Preconditions
 
@@ -101,5 +103,23 @@ layout changes, something appearing in the UI). Static ideas keep their symbol.
 
 - One commit with the notes, any scenes and the version bump: `chore(release): vX.Y.Z`.
 - An annotated tag whose message is the summary: `git tag -a vX.Y.Z -m "<summary>"`.
-- Don't push. End with what changed, then `git push origin main vX.Y.Z` for Marc to run when he's
-  ready.
+- Don't push.
+
+## 8. Build the DMG
+
+- `make dist`: archives with Developer ID, notarizes and staples `build/Pulse.dmg`. It refuses a
+  dirty tree or an untagged HEAD. Notarization usually takes a few minutes.
+- It needs the Developer ID Application certificate in the login keychain and the `pulse`
+  notarytool profile. If either is missing, stop and tell Marc which; never work around signing.
+- On failure, read `xcrun notarytool log <submission-id> --keychain-profile pulse` before retrying.
+
+End with what changed, then the commands for Marc to run in this order:
+
+```sh
+git push origin vX.Y.Z
+gh release create vX.Y.Z build/Pulse.dmg --verify-tag --title "Pulse X.Y.Z" --notes "<summary>"
+git push origin main
+```
+
+Keep the asset named `Pulse.dmg`: `releases/latest/download/Pulse.dmg` is the stable link the
+download page uses.
