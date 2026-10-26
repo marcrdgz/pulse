@@ -98,7 +98,11 @@ struct CommandBarView: View {
         case .moveUp:
             selectedIndex = max(selectedIndex - 1, 0)
         case .submit:
-            if suggestions.indices.contains(selectedIndex) {
+            if mode == .editActiveTab, !hasEdited {
+                // ⌘L ⏎ goes to the address already shown, as in Safari and Chrome.
+                browser.activeTab?.reload()
+                browser.dismissCommandBar()
+            } else if suggestions.indices.contains(selectedIndex) {
                 perform(suggestions[selectedIndex])
             }
         case .cancel:
