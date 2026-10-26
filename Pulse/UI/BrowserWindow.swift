@@ -13,8 +13,8 @@ struct BrowserWindow: View {
     @State private var dragController = SidebarDragController()
     /// Shared by the sidebar, which the swipe drags, and the window background, whose color follows it.
     @State private var swipeTracker = SpaceSwipeTracker()
-    /// The side a split view pane just closed on, fading out over the pane that took its place.
-    @State private var closedPaneSide: ClosedPaneSide?
+    /// A split view pane that just closed, while the page left grows over its place.
+    @State private var closingPane: ClosingSplitPane?
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
@@ -105,51 +105,84 @@ struct BrowserWindow: View {
     private var content: some View {
         let tabs = browser.visibleTabs
         let split = browser.activeSplit
-        return GeometryReader { proxy in
-            let available = max(proxy.size.width - Theme.contentInset, 1)
-            HStack(spacing: Theme.contentInset) {
-                ForEach(Array(tabs.enumerated()), id: \.element.id) { index, tab in
-                    let isLeadingPane = index == 0 && tabs.count == 2
-                    card {
-                        if tabs.count == 2 {
-                            SplitPaneBar(tab: tab, isFocused: tab.id == browser.activeTabID && browser.peek == nil)
-                        }
-                        if index == 0 { banner }
-                        page(for: tab)
-                    }
-                    .frame(width: isLeadingPane ? available * (split?.ratio ?? 0.5) : nil)
-                    .overlay(alignment: .trailing) {
-                        if isLeadingPane {
-                            SplitDivider(available: available)
-                                .offset(x: Theme.contentInset)
-                        }
-                    }
-                }
-                if tabs.isEmpty {
-                    card {
-                        banner
-                        EmptyStateView()
-                    }
-                }
+        // Frame by frame while a pane closes, so the page resizes the way dragging the divider does.
+        return TimelineView(.animation(paused: closingPane == nil)) { timeline in
+            GeometryReader { proxy in
+                panes(width: proxy.size.width, at: timeline.date)
             }
         }
         .overlay {
             SplitDropPreview()
                 .environment(dragController)
         }
-        .overlay {
-            if let closedPaneSide {
-                ClosedPaneFade(closed: closedPaneSide) { self.closedPaneSide = nil }
-                    .id(closedPaneSide.id)
-            }
-        }
         .onChange(of: split) { old, new in
-            guard let old, new == nil, tabs.count == 1, let kept = tabs.first?.id, old.contains(kept) else { return }
-            closedPaneSide = ClosedPaneSide(side: kept == old.leading ? .trailing : .leading, ratio: old.ratio)
+            closingPane = nil
+            guard !reduceMotion, let old, new == nil, tabs.count == 1, let kept = tabs.first?.id,
+                  old.contains(kept) else { return }
+            closingPane = ClosingSplitPane(side: kept == old.leading ? .trailing : .leading, ratio: old.ratio)
+        }
+        .task(id: closingPane?.id) {
+            guard closingPane != nil else { return }
+            try? await Task.sleep(for: .seconds(ClosingSplitPane.duration))
+            if !Task.isCancelled { closingPane = nil }
         }
         .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { dragController.contentFrame = $0 }
         .padding(.vertical, Theme.contentInset)
         .padding(.trailing, Theme.contentInset)
+    }
+
+    private func panes(width: Double, at date: Date) -> some View {
+        let tabs = browser.visibleTabs
+        let split = browser.activeSplit
+        let available = max(width - Theme.contentInset, 1)
+        let closing = tabs.count == 1 ? closingPane : nil
+        // The page left takes its full width at once and is uncovered as it grows, so its web view
+        // lays out once instead of on every frame. Over a closed leading pane it slides into place.
+        let keptWidth = closing.map { CGFloat($0.keptWidth(in: width, at: date)) }
+        let slide = closing?.side == .leading ? width - (keptWidth ?? width) : 0
+        return HStack(spacing: Theme.contentInset) {
+            ForEach(Array(tabs.enumerated()), id: \.element.id) { index, tab in
+                let isLeadingPane = index == 0 && tabs.count == 2
+                card {
+                    if tabs.count == 2 {
+                        SplitPaneBar(tab: tab, isFocused: tab.id == browser.activeTabID && browser.peek == nil)
+                    }
+                    if index == 0 { banner }
+                    page(for: tab)
+                }
+                .frame(width: isLeadingPane ? available * (split?.ratio ?? 0.5) : nil)
+                // Always applied, so the pane keeps its identity and web view. When nothing is
+                // closing it reaches past the card to keep its shadow.
+                .mask(alignment: .leading) {
+                    RoundedRectangle(cornerRadius: keptWidth == nil ? 0 : Theme.contentCornerRadius, style: .continuous)
+                        .frame(width: keptWidth)
+                        .padding(keptWidth == nil ? -Theme.contentInset : 0)
+                }
+                .offset(x: slide)
+                .overlay(alignment: .trailing) {
+                    if isLeadingPane {
+                        SplitDivider(available: available)
+                            .offset(x: Theme.contentInset)
+                    }
+                }
+            }
+            if tabs.isEmpty {
+                card {
+                    banner
+                    EmptyStateView()
+                }
+            }
+        }
+        .overlay(alignment: closing?.side == .leading ? .leading : .trailing) {
+            if let closing, let keptWidth {
+                // The closed pane, emptied, giving way to the page sliding over it.
+                RoundedRectangle(cornerRadius: Theme.contentCornerRadius, style: .continuous)
+                    .fill(Color(nsColor: .windowBackgroundColor))
+                    .frame(width: max(width - keptWidth - Theme.contentInset, 0))
+                    .opacity(1 - closing.progress(at: date))
+                    .allowsHitTesting(false)
+            }
+        }
     }
 
     @ViewBuilder private var banner: some View {
@@ -572,38 +605,28 @@ private struct SplitDropCard: View {
     }
 }
 
-/// Where a split view pane closed, and how wide it was.
-private struct ClosedPaneSide: Equatable {
+/// A split view pane that closed, and how far the page left has grown over its place.
+/// The page's width is set on each frame, like a divider drag sets it, rather than animated:
+/// a SwiftUI animation of the web view's frame stutters.
+private struct ClosingSplitPane {
+    static let duration = 0.24
     let id = UUID()
     let side: SplitSide
     /// The leading pane's share of the width.
     let ratio: Double
-}
+    let start = Date.now
 
-/// A blank card over the place a closed pane left, fading away to uncover the page that took it.
-/// The remaining page jumps to its new width at once: animating it would make the web view lay
-/// its page out again on every frame, which stutters.
-private struct ClosedPaneFade: View {
-    let closed: ClosedPaneSide
-    let onFinish: () -> Void
-    @State private var isFaded = false
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    /// From 0 to 1, easing out.
+    func progress(at date: Date) -> Double {
+        let linear = min(max(date.timeIntervalSince(start) / Self.duration, 0), 1)
+        return 1 - pow(1 - linear, 3)
+    }
 
-    var body: some View {
-        GeometryReader { proxy in
-            let available = proxy.size.width - Theme.contentInset
-            let share = closed.side == .leading ? closed.ratio : 1 - closed.ratio
-            RoundedRectangle(cornerRadius: Theme.contentCornerRadius, style: .continuous)
-                .fill(Color(nsColor: .windowBackgroundColor))
-                .frame(width: available * share)
-                .scaleEffect(isFaded && !reduceMotion ? 0.96 : 1)
-                .opacity(isFaded ? 0 : 1)
-                .frame(maxWidth: .infinity, alignment: closed.side == .leading ? .leading : .trailing)
-        }
-        .allowsHitTesting(false)
-        .onAppear {
-            withAnimation(.easeOut(duration: 0.25)) { isFaded = true } completion: { onFinish() }
-        }
+    /// The page left's width at `date`, from its share of the split to all of `width`.
+    func keptWidth(in width: Double, at date: Date) -> Double {
+        let available = width - Theme.contentInset
+        let from = available * (side == .leading ? 1 - ratio : ratio)
+        return from + (width - from) * progress(at: date)
     }
 }
 
