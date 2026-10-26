@@ -15,9 +15,24 @@ struct AgentRequest: Identifiable {
     }
 
     let id = UUID()
+    /// Keys only answer once the question has been on screen a moment, so an Enter typed into the
+    /// page just as it appears doesn't allow something the user never saw.
+    let shownAt = Date.now
     let tabID: Tab.ID
     let kind: Kind
     fileprivate let respond: (Bool) -> Void
+}
+
+/// The user's OK for an agent to use one of their tabs on one site, until it goes unused for a while.
+private struct Grant {
+    static let idleLimit: TimeInterval = 10 * 60
+
+    let site: String
+    let lastUsed: Date
+
+    func allows(_ site: String, at date: Date) -> Bool {
+        site == self.site && date.timeIntervalSince(lastUsed) < Self.idleLimit
+    }
 }
 
 /// What the agent is doing in a tab, shown in the dock at the bottom of its page.
@@ -40,7 +55,8 @@ private struct AgentError: Error {
 ///
 /// Pages can carry instructions aimed at the agent (prompt injection), so the user stays in charge:
 /// - the agent's own tabs are signed out, and opening one signed in asks first;
-/// - it asks before using each of the user's tabs, again whenever the tab is on another site;
+/// - it asks before using each of the user's tabs, again whenever the tab is on another site, after
+///   ten minutes unused, or when a new agent session connects;
 /// - once it has seen a signed-in page, going to a new site or sending a form asks first, showing
 ///   where the data would go;
 /// - clicks that look like sending, paying or deleting ask first;
@@ -56,7 +72,9 @@ final class Agent {
 
     @ObservationIgnored weak var browser: Browser?
     /// The site each signed-in tab may be used on: what the user allowed, or opened signed in.
-    @ObservationIgnored private var siteGrants: [Tab.ID: String] = [:]
+    @ObservationIgnored private var siteGrants: [Tab.ID: Grant] = [:]
+    /// Settable so tests can move time forward.
+    @ObservationIgnored var now: () -> Date = { .now }
     /// The agent's own signed-out tabs, usable on any site.
     @ObservationIgnored private var signedOutTabIDs: Set<Tab.ID> = []
     /// From the first signed-in page the agent can use, anything it reads could be sent wherever it
@@ -74,6 +92,8 @@ final class Agent {
         let known = ["claude": "Claude", "codex": "Codex", "cursor": "Cursor", "chatgpt": "ChatGPT"]
         name = known.first { client.lowercased().contains($0.key) }?.value ?? (client.isEmpty ? "AI" : client)
         hasSeenSignedInPages = false
+        // A new session didn't get the user's OK; whatever they allowed was for the one before.
+        siteGrants.removeAll()
     }
 
     // MARK: User decisions
@@ -255,7 +275,7 @@ final class Agent {
             guard await ask(.open(url, signedIn: isSignedIn), in: tab) else {
                 throw AgentError("The user didn't let you open \(url.absoluteString). Stop and ask them in your reply.")
             }
-            if isSignedIn { siteGrants[tab.id] = site(of: url) }
+            if isSignedIn { siteGrants[tab.id] = Grant(site: site(of: url), lastUsed: now()) }
         }
         show("Opening \(url.displayHost ?? url.absoluteString)", in: tab)
         tab.load(url)
@@ -295,7 +315,7 @@ final class Agent {
     }
 
     private func grantSignedIn(_ tab: Tab, site: String) {
-        siteGrants[tab.id] = site
+        siteGrants[tab.id] = Grant(site: site, lastUsed: now())
         hasSeenSignedInPages = true
     }
 
@@ -312,7 +332,7 @@ final class Agent {
         let tab = try tab(in: arguments)
         guard !signedOutTabIDs.contains(tab.id) else { return tab }
         let site = site(of: tab.url)
-        if siteGrants[tab.id] != site {
+        if !(siteGrants[tab.id]?.allows(site, at: now()) ?? false) {
             guard await ask(.useTab(site: site), in: tab) else {
                 throw AgentError("The user didn't let you use this tab. Don't retry; ask them in your reply.")
             }

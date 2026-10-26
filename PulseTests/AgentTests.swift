@@ -107,6 +107,28 @@ struct AgentTests {
         #expect(await moved.value.text.contains("didn't let you use this tab"))
     }
 
+    @Test func allowingATabEndsWithTheSessionOrAfterIdling() async throws {
+        let tab = browser.openTab(url: URL(string: "https://example.com")!)
+        let allowing = probe(tab)
+        _ = await answerNext(in: tab, allow: true)
+        _ = await allowing.value
+
+        let start = Date.now
+        agent.now = { start.addingTimeInterval(9 * 60) }
+        _ = await probe(tab).value
+        #expect(agent.requests.isEmpty)
+
+        agent.now = { start.addingTimeInterval(20 * 60) }
+        let idle = probe(tab)
+        #expect(await answerNext(in: tab, allow: true) == .useTab(site: "example.com"))
+        _ = await idle.value
+
+        agent.clientDidConnect(name: "claude-code")
+        let reconnected = probe(tab)
+        #expect(await answerNext(in: tab, allow: false) == .useTab(site: "example.com"))
+        _ = await reconnected.value
+    }
+
     /// The attack Brave showed on Comet: after reading a signed-in page, the agent is steered to carry
     /// what it read to another site in an address. Pulse shows that address and waits.
     @Test func showsTheAddressBeforeLeavingASignedInSite() async throws {

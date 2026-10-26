@@ -316,7 +316,8 @@ struct BrowserWindow: View {
             // The agent's bar answers to ↩ and Esc, and ⌘. takes the tab back, even while the page
             // has focus and would otherwise take the keys.
             if let agent = browser.agent, let tab = browser.focusedTab, browser.commandBar == nil {
-                if modifiers.isEmpty, [36, 76, 53].contains(event.keyCode), let request = agent.request(for: tab) {
+                if modifiers.isEmpty, [36, 76, 53].contains(event.keyCode), let request = agent.request(for: tab),
+                   Date.now.timeIntervalSince(request.shownAt) > 0.8 {
                     agent.answer(request, allow: event.keyCode != 53)
                     return nil
                 }
