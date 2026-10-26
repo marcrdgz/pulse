@@ -427,7 +427,7 @@ private struct AISettings: View {
     }
 
     private var connectCommand: String {
-        "claude mcp add --scope user --transport http pulse \(MCPServer.endpoint) "
+        "claude mcp add --scope user --transport http \(MCPServer.name) \(MCPServer.endpoint) "
             + "--header \"Authorization: Bearer \(browser.preferences.agentToken)\""
     }
 }

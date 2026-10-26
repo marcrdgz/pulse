@@ -15,7 +15,11 @@ final class MCPServer {
         case failed(String)
     }
 
-    static let port: UInt16 = 47821
+    /// Pulse and Pulse Dev are separate apps with separate keys, and both may run at once, so each
+    /// gets its own port and its own name in the agent's MCP settings.
+    private static let isDevBuild = Bundle.main.bundleIdentifier?.hasSuffix(".dev") ?? false
+    static let port: UInt16 = isDevBuild ? 47822 : 47821
+    static let name = isDevBuild ? "pulse-dev" : "pulse"
     static var endpoint: String { "http://127.0.0.1:\(port)/mcp" }
 
     private(set) var state = State.stopped
@@ -67,7 +71,9 @@ final class MCPServer {
         case .failed(let error):
             listener?.cancel()
             listener = nil
-            state = .failed(error.debugDescription)
+            state = .failed(error == .posix(.EADDRINUSE)
+                ? "Another app is using port \(Self.port). Quit it and turn this off and on again."
+                : error.localizedDescription)
         default:
             break
         }
@@ -125,7 +131,7 @@ final class MCPServer {
                 // Every revision so far is compatible with what this server uses, so echo the client's.
                 "protocolVersion": params["protocolVersion"] as? String ?? "2025-06-18",
                 "capabilities": ["tools": [:]],
-                "serverInfo": ["name": "pulse", "version": Bundle.main.shortVersion],
+                "serverInfo": ["name": Self.name, "version": Bundle.main.shortVersion],
                 "instructions": Agent.instructions,
             ]
         case "ping":
