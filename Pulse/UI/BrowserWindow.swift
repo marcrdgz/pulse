@@ -109,6 +109,9 @@ struct BrowserWindow: View {
                 ForEach(Array(tabs.enumerated()), id: \.element.id) { index, tab in
                     let isLeadingPane = index == 0 && tabs.count == 2
                     card {
+                        if tabs.count == 2 {
+                            SplitPaneBar(tab: tab, isFocused: tab.id == browser.activeTabID && browser.peek == nil)
+                        }
                         if index == 0 { banner }
                         page(for: tab)
                     }
