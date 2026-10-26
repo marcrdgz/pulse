@@ -58,7 +58,9 @@ struct AgentPrompt: View {
         switch request.kind {
         case .useTab: "It reads and acts here, signed in as you."
         case .confirm: "This may send, pay or delete something, or carry what it read to this site."
-        case .open: "Pages it read can hide your data in an address. Check where it goes."
+        case .open(_, let signedIn):
+            (signedIn ? "It will use this site as you." : "It opens without your sign-ins.")
+                + " Check the address: pages it read can hide your data in one."
         }
     }
 

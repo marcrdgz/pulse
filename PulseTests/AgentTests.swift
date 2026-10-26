@@ -153,7 +153,7 @@ struct AgentTests {
         #expect(browser.todayTabs.count == tabCount)
     }
 
-    @Test func opensItsOwnTabsSignedOutUnlessAllowed() async throws {
+    @Test func asksBeforeOpeningATabAndOpensItSignedOut() async throws {
         let signedIn = Task { await agent.call("open_tab", arguments: ["url": "https://mail.example.com", "signed_in": true]) }
         while agent.requests.isEmpty { await Task.yield() }
         let blank = try #require(browser.activeTab)
@@ -164,9 +164,11 @@ struct AgentTests {
         let signedOut = Task { await agent.call("open_tab", arguments: ["url": "https://example.com"]) }
         while browser.todayTabs.isEmpty { await Task.yield() }
         let tab = try #require(browser.todayTabs.first)
+        #expect(browser.activeTab === tab)
+        #expect(tab.url.absoluteString == "about:blank")
+        #expect(await answerNext(in: tab, allow: true) == .open(URL(string: "https://example.com")!, signedIn: false))
         #expect(tab.websiteDataStore?.isPersistent == false)
         #expect(tab.websiteDataStore !== browser.websiteDataStore)
-        #expect(agent.requests.isEmpty)
         _ = await signedOut.value
     }
 
