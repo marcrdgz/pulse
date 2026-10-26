@@ -76,6 +76,10 @@ final class Browser: NSObject {
     @ObservationIgnored let history: HistoryStore?
     @ObservationIgnored private let sessionStore: SessionStore?
     @ObservationIgnored let sitePermissions: SitePermissionStore?
+    /// `nil` in private windows, which agents never see.
+    @ObservationIgnored let agent: Agent?
+    /// Started from the AI settings; `nil` with `agent`.
+    @ObservationIgnored let agentServer: MCPServer?
     @ObservationIgnored private var saveTask: Task<Void, Never>?
     @ObservationIgnored private var toastTask: Task<Void, Never>?
     @ObservationIgnored private var hibernationTask: Task<Void, Never>?
@@ -111,7 +115,11 @@ final class Browser: NSObject {
         self.isPrivate = isPrivate
         websiteDataStore = isPrivate ? .nonPersistent() : .default()
         faviconLoader = isPrivate ? .ephemeral : .shared
+        let agent = isPrivate ? nil : Agent()
+        self.agent = agent
+        agentServer = agent.map { MCPServer(agent: $0) { [preferences] in preferences.agentToken } }
         super.init()
+        agent?.browser = self
         downloads.browser = self
         contentBlocker.register(self)
         contentBlocker.start()
@@ -333,6 +341,7 @@ final class Browser: NSObject {
             closePeek()
         }
         activeSpace.activeTabID = tab?.id
+        if let tab { agent?.tabWasShown(tab) }
         activeTabDidChange(from: previous)
         scheduleSave()
     }
@@ -369,6 +378,7 @@ final class Browser: NSObject {
         if tab === peek?.opener { closePeek() }
         let previous = activeTab
         denyPermissionRequests(from: tab)
+        agent?.tabWillClose(tab)
         // Closing one pane of a split view leaves the other on screen, like Arc.
         let partner = space(containing: tab).flatMap { space in
             space.split(containing: tab.id)?.partner(of: tab.id).flatMap(space.tab(withID:))

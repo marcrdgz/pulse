@@ -203,8 +203,37 @@ struct BrowserWindow: View {
                         .transition(.opacity)
                 }
             }
+            .overlay { agentOverlay(for: tab) }
             .animation(.snappy(duration: 0.2), value: browser.activePermissionRequest?.id)
             .animation(.easeOut(duration: 0.12), value: tab.hoveredLink == nil)
+    }
+
+    /// While an agent works in the tab: a glow around the page, its status at the bottom, and its questions on top.
+    @ViewBuilder private func agentOverlay(for tab: Tab) -> some View {
+        if let agent = browser.agent {
+            let activity = agent.activities[tab.id]
+            let request = agent.request(for: tab)
+            ZStack {
+                if let activity, !activity.isDone {
+                    RoundedRectangle(cornerRadius: Theme.contentCornerRadius, style: .continuous)
+                        .strokeBorder(Theme.agentTint.opacity(0.7), lineWidth: 3)
+                        .allowsHitTesting(false)
+                }
+                if let activity {
+                    AgentDock(agent: agent, tab: tab, activity: activity)
+                        .frame(maxHeight: .infinity, alignment: .bottom)
+                        .transition(.slide(from: .bottom, reduceMotion: reduceMotion))
+                }
+                if let request {
+                    AgentPrompt(agent: agent, request: request)
+                        .padding(12)
+                        .frame(maxHeight: .infinity, alignment: .top)
+                        .transition(.slide(from: .top, reduceMotion: reduceMotion))
+                }
+            }
+            .animation(.snappy(duration: 0.2), value: request?.id)
+            .animation(.snappy(duration: 0.2), value: activity == nil)
+        }
     }
 
     /// A link previewed in a card over the dimmed page, like Arc's Peek. Clicking beside it or

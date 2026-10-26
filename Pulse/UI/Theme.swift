@@ -49,9 +49,13 @@ enum Theme {
         case .downloads: 0xD2337E
         case .privacy: 0x7B4DFF
         case .extensions: 0x4B3BB8
+        case .ai: 0x7B4DFF
         }
         return Color(nsColor: NSColor(hex: hex))
     }
+
+    /// What AI agents show in Pulse: their pointer, prompts and dock.
+    static let agentTint = Color(nsColor: NSColor(hex: 0x7B4DFF))
 
     static let sidebarText = Color.dynamic(light: NSColor(hex: 0x1F1B33), dark: NSColor(hex: 0xF2F0FA))
     static let activeTabFill = Color.dynamic(light: .white.withAlphaComponent(0.85), dark: .white.withAlphaComponent(0.16))

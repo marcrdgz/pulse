@@ -33,6 +33,7 @@ struct TabRow: View {
             Spacer(minLength: 4)
             MediaCaptureIndicator(tab: tab, showsAudio: false)
                 .font(.system(size: 10, weight: .semibold))
+            AgentIndicator(tab: tab)
             if tab.isPlayingAudio || tab.isMuted {
                 Button(action: tab.toggleMuted) {
                     Image(systemName: tab.isMuted ? "speaker.slash.fill" : "speaker.wave.2.fill")
@@ -282,6 +283,27 @@ struct MediaCaptureIndicator: View {
         case (.muted, _): "video.slash.fill"
         case (_, .muted): "mic.slash.fill"
         default: nil
+        }
+    }
+}
+
+/// Sparkles while an agent works in the tab, then a tick until the user opens it.
+private struct AgentIndicator: View {
+    @Environment(Browser.self) private var browser
+    let tab: Tab
+
+    var body: some View {
+        if let agent = browser.agent {
+            if agent.finishedTabIDs.contains(tab.id) {
+                Image(systemName: "checkmark.circle.fill")
+                    .foregroundStyle(Theme.agentTint)
+                    .help("\(agent.name) finished here")
+            } else if let activity = agent.activities[tab.id], !activity.isDone {
+                Image(systemName: "sparkles")
+                    .foregroundStyle(Theme.agentTint)
+                    .symbolEffect(.pulse)
+                    .help(activity.status)
+            }
         }
     }
 }

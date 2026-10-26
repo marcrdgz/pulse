@@ -30,6 +30,8 @@ targets:
         ENABLE_HARDENED_RUNTIME: YES
         ENABLE_APP_SANDBOX: YES
         ENABLE_OUTGOING_NETWORK_CONNECTIONS: YES
+        # The MCP server AI agents connect to; it listens on loopback only.
+        ENABLE_INCOMING_NETWORK_CONNECTIONS: YES
         ENABLE_USER_SELECTED_FILES: readwrite
         ENABLE_FILE_ACCESS_DOWNLOADS_FOLDER: readwrite
         ENABLE_RESOURCE_ACCESS_CAMERA: YES

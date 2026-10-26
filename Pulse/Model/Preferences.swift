@@ -116,6 +116,10 @@ final class Preferences {
     var tabSleepDelay: TabSleepDelay { didSet { save(tabSleepDelay.rawValue, Key.tabSleepDelay) } }
     /// Links from a pinned tab or favorite to another site open in Peek, like Arc, so the pinned page stays put.
     var opensPinnedLinksInPeek: Bool { didSet { save(opensPinnedLinksInPeek, Key.pinnedLinksInPeek) } }
+    /// Runs the MCP server that lets AI agents on this Mac (Claude Code, Codex…) use Pulse's tabs.
+    var allowsAgents: Bool { didSet { save(allowsAgents, Key.allowsAgents) } }
+    /// The bearer token agents connect with, so other programs on the Mac can't drive the browser.
+    private(set) var agentToken: String { didSet { save(agentToken, Key.agentToken) } }
     /// The version whose What's New was last offered, so each update announces itself once.
     var lastSeenVersion: String? { didSet { if let lastSeenVersion { save(lastSeenVersion, Key.lastSeenVersion) } } }
 
@@ -132,6 +136,8 @@ final class Preferences {
         static let tabSleepDelay = "tabSleepDelayMinutes"
         static let pinnedLinksInPeek = "opensPinnedLinksInPeek"
         static let lastSeenVersion = "lastSeenVersion"
+        static let allowsAgents = "allowsAgents"
+        static let agentToken = "agentToken"
     }
 
     init(defaults: UserDefaults? = nil) {
@@ -146,6 +152,14 @@ final class Preferences {
         tabSleepDelay = (defaults?.object(forKey: Key.tabSleepDelay) as? Int).flatMap(TabSleepDelay.init) ?? .oneHour
         opensPinnedLinksInPeek = defaults?.object(forKey: Key.pinnedLinksInPeek) as? Bool ?? true
         lastSeenVersion = defaults?.string(forKey: Key.lastSeenVersion)
+        allowsAgents = defaults?.bool(forKey: Key.allowsAgents) ?? false
+        agentToken = defaults?.string(forKey: Key.agentToken) ?? ""
+        if agentToken.isEmpty { resetAgentToken() }
+    }
+
+    /// Disconnects every agent configured with the old token.
+    func resetAgentToken() {
+        agentToken = (0..<32).map { _ in String(format: "%02x", UInt8.random(in: .min ... .max)) }.joined()
     }
 
     private func save(_ value: Any, _ key: String) {
