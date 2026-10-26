@@ -4,7 +4,7 @@ import SwiftUI
 /// without first focusing it. The sidebar's controls only reach the focused pane.
 /// It takes the page's color, like Safari's compact tabs, so it reads as part of the page.
 struct SplitPaneBar: View {
-    static let height: CGFloat = 30
+    static let height: CGFloat = 24
     @Environment(Browser.self) private var browser
     let tab: Tab
     let isFocused: Bool
@@ -52,12 +52,12 @@ struct SplitPaneBar: View {
                 .accessibilityLabel("Close Pane")
                 .help("Close Pane")
         }
-        .font(.system(size: 12, weight: .medium))
-        .buttonStyle(SidebarIconButtonStyle(size: 22))
+        .font(.system(size: 10, weight: .medium))
+        .buttonStyle(SidebarIconButtonStyle(size: 20))
         // The unfocused pane's bar steps back, so it's clear which page the keyboard reaches.
         .opacity(isFocused ? 1 : 0.55)
         .animation(.easeOut(duration: 0.15), value: isFocused)
-        .padding(.horizontal, 6)
+        .padding(.horizontal, 4)
         .frame(height: Self.height)
         .background(Color(nsColor: pageColor ?? .windowBackgroundColor))
         // Icons and hover fills follow the page's lightness, not the system appearance.
@@ -75,11 +75,11 @@ struct SplitPaneBar: View {
             HStack(spacing: 4) {
                 if tab.url.scheme == "https" {
                     Image(systemName: "lock.fill")
-                        .font(.system(size: 8))
+                        .font(.system(size: 7))
                         .opacity(0.5)
                 }
                 Text(tab.internalPage?.url.absoluteString ?? tab.url.displayHost ?? tab.displayTitle)
-                    .font(.system(size: 12))
+                    .font(.system(size: 11))
                     .lineLimit(1)
                     .truncationMode(.middle)
             }

@@ -6,6 +6,8 @@ struct WebView: NSViewRepresentable {
     let tab: Tab
     /// Both panes of a split view are on screen; only the active tab's takes keyboard focus.
     var takesFocus = true
+    /// Off when a bar sits above the page, which would otherwise show through the rounded corners.
+    var roundsTopCorners = true
 
     final class Coordinator {
         var hadFocus = false
@@ -30,6 +32,11 @@ struct WebView: NSViewRepresentable {
     }
 
     func updateNSView(_ container: NSView, context: Context) {
+        // Layer-backed views aren't flipped: min Y is the bottom edge.
+        let bottomCorners: CACornerMask = [.layerMinXMinYCorner, .layerMaxXMinYCorner]
+        container.layer?.maskedCorners = roundsTopCorners
+            ? bottomCorners.union([.layerMinXMaxYCorner, .layerMaxXMaxYCorner])
+            : bottomCorners
         let webView = tab.webView
         let isNewlyShown = webView.superview !== container
         // A container still on screen while it animates out, like Peek's card after "Open as Tab",

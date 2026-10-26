@@ -170,7 +170,7 @@ struct BrowserWindow: View {
             WhatsNewPage()
                 .simultaneousGesture(focusOnClick(tab))
         } else {
-            webPage(for: tab, isFocused: isFocused)
+            webPage(for: tab, isFocused: isFocused, roundsTopCorners: browser.activeSplit == nil)
         }
     }
 
@@ -179,8 +179,8 @@ struct BrowserWindow: View {
         TapGesture().onEnded { browser.focusPane(of: tab) }
     }
 
-    private func webPage(for tab: Tab, isFocused: Bool) -> some View {
-        WebView(tab: tab, takesFocus: isFocused)
+    private func webPage(for tab: Tab, isFocused: Bool, roundsTopCorners: Bool = true) -> some View {
+        WebView(tab: tab, takesFocus: isFocused, roundsTopCorners: roundsTopCorners)
             .overlay {
                 if let error = tab.loadError {
                     LoadErrorView(tab: tab, error: error)
