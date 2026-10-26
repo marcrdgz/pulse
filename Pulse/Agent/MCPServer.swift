@@ -97,7 +97,11 @@ final class MCPServer {
         // Browsers always send Origin on a POST, so this keeps web pages (including Pulse's own)
         // from driving the browser through a form or fetch to localhost.
         guard request.headers["origin"] == nil else { return HTTPResponse(status: 403) }
-        guard request.headers["authorization"] == "Bearer \(token())" else { return HTTPResponse(status: 401) }
+        // A DNS-rebinding page reaches this port under its own host name.
+        guard ["127.0.0.1:\(Self.port)", "localhost:\(Self.port)"].contains(request.headers["host"] ?? "")
+        else { return HTTPResponse(status: 403) }
+        guard Self.isEqualInConstantTime(request.headers["authorization"] ?? "", "Bearer \(token())")
+        else { return HTTPResponse(status: 401) }
         guard request.path == "/mcp" else { return HTTPResponse(status: 404) }
         guard request.method == "POST" else { return HTTPResponse(status: 405) }
         guard let reply = await reply(to: request.body) else { return HTTPResponse(status: 202) }
@@ -136,6 +140,13 @@ final class MCPServer {
             reply["error"] = ["code": -32601, "message": "Method not found: \(method)"]
         }
         return Self.encode(reply)
+    }
+
+    /// So the time a wrong key takes to reject doesn't reveal how much of it was right.
+    private static func isEqualInConstantTime(_ lhs: String, _ rhs: String) -> Bool {
+        let lhs = Array(lhs.utf8), rhs = Array(rhs.utf8)
+        guard lhs.count == rhs.count else { return false }
+        return zip(lhs, rhs).reduce(0) { $0 | ($1.0 ^ $1.1) } == 0
     }
 
     private static func encode(_ object: JSONObject) -> Data {

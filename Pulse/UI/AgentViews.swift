@@ -11,10 +11,21 @@ struct AgentPrompt: View {
             Image(systemName: "sparkles")
                 .font(.system(size: 14, weight: .semibold))
                 .foregroundStyle(Theme.agentTint)
-            Text(title)
-                .lineLimit(1)
-                .truncationMode(.middle)
-                .help(detail)
+            VStack(alignment: .leading, spacing: 3) {
+                Text(title)
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+                // In full: the query is where a page would hide the user's data.
+                if case .open(let url, _) = request.kind {
+                    Text(Self.address(of: url))
+                        .font(.system(size: 11, design: .monospaced))
+                        .foregroundStyle(.secondary)
+                        .lineLimit(3)
+                        .truncationMode(.middle)
+                        .textSelection(.enabled)
+                }
+            }
+            .help(detail)
             Spacer(minLength: 16)
             Button(declineTitle) { agent.answer(request, allow: false) }
                 .buttonStyle(KeyCapButtonStyle(key: "esc"))
@@ -24,30 +35,45 @@ struct AgentPrompt: View {
         .font(.system(size: 13))
         .padding(.leading, 16)
         .padding(.trailing, 7)
-        .frame(width: 480, height: 46)
-        .background(.background, in: Capsule())
-        .overlay(Capsule().strokeBorder(.primary.opacity(0.08)))
+        .padding(.vertical, isAddress ? 8 : 0)
+        .frame(width: isAddress ? 560 : 480)
+        .frame(minHeight: 46)
+        .background(.background, in: RoundedRectangle(cornerRadius: 23, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: 23, style: .continuous).strokeBorder(.primary.opacity(0.08)))
         .shadow(color: .black.opacity(0.18), radius: 14, y: 5)
     }
 
     private var title: AttributedString {
         var name = AttributedString(agent.name)
         name.font = .system(size: 13, weight: .semibold)
-        return switch request.kind {
-        case .useTab: name + AttributedString(" wants to use this tab")
-        case .confirm(let label): name + AttributedString(" wants to click “\(label)”")
+        let action = switch request.kind {
+        case .useTab(let site): " wants to use this tab on \(site)"
+        case .confirm(let label, let site): " wants to click “\(label)” on \(site)"
+        case .open(_, let signedIn): signedIn ? " wants to open, signed in as you:" : " wants to open:"
         }
+        return name + AttributedString(action)
     }
 
     private var detail: String {
         switch request.kind {
         case .useTab: "It reads and acts here, signed in as you."
-        case .confirm: "This may send, pay or delete something."
+        case .confirm: "This may send, pay or delete something, or carry what it read to this site."
+        case .open: "Pages it read can hide your data in an address. Check where it goes."
         }
     }
 
+    private var isAddress: Bool {
+        if case .open = request.kind { true } else { false }
+    }
+
     private var declineTitle: String {
-        request.kind == .useTab ? "Not Now" : "Don't Allow"
+        if case .useTab = request.kind { "Not Now" } else { "Don't Allow" }
+    }
+
+    /// Without the scheme, but with the query, where data would ride along.
+    private static func address(of url: URL) -> String {
+        let address = url.absoluteString.replacingOccurrences(of: #"^https?://(www\.)?"#, with: "", options: .regularExpression)
+        return address.hasSuffix("/") ? String(address.dropLast()) : address
     }
 }
 
