@@ -13,6 +13,8 @@ struct BrowserWindow: View {
     @State private var dragController = SidebarDragController()
     /// Shared by the sidebar, which the swipe drags, and the window background, whose color follows it.
     @State private var swipeTracker = SpaceSwipeTracker()
+    /// The panes of the split last on screen, to tell a split closing from a switch to another tab.
+    @State private var lastSplitTabIDs: Set<UUID> = []
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
@@ -116,6 +118,7 @@ struct BrowserWindow: View {
                         page(for: tab)
                     }
                     .frame(width: isLeadingPane ? available * (split?.ratio ?? 0.5) : nil)
+                    .transition(.opacity.combined(with: .scale(scale: 0.96)))
                     .overlay(alignment: .trailing) {
                         if isLeadingPane {
                             SplitDivider(available: available)
@@ -134,6 +137,14 @@ struct BrowserWindow: View {
         .overlay {
             SplitDropPreview()
                 .environment(dragController)
+        }
+        // Closing or separating a pane lets the other grow into its place; switching tabs stays instant.
+        .animation(
+            tabs.contains { lastSplitTabIDs.contains($0.id) } ? .snappy(duration: 0.28) : nil,
+            value: tabs.map(\.id)
+        )
+        .onChange(of: split.map { [$0.leading, $0.trailing] }, initial: true) { _, ids in
+            lastSplitTabIDs = Set(ids ?? [])
         }
         .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { dragController.contentFrame = $0 }
         .padding(.vertical, Theme.contentInset)
