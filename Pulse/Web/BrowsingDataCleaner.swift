@@ -43,7 +43,12 @@ enum BrowsingDataCleaner {
         WKWebsiteDataTypeOfflineWebApplicationCache,
     ]
 
-    static func clear(_ selection: BrowsingDataSelection, in range: BrowsingDataRange, history: HistoryStore?) async {
+    static func clear(
+        _ selection: BrowsingDataSelection,
+        in range: BrowsingDataRange,
+        history: HistoryStore?,
+        dataStores: [WKWebsiteDataStore]
+    ) async {
         let since = range.startDate()
         if selection.history {
             history?.deleteVisits(since: since)
@@ -60,6 +65,8 @@ enum BrowsingDataCleaner {
         if selection.cookies { types.formUnion(WKWebsiteDataStore.allWebsiteDataTypes().subtracting(cacheTypes)) }
         if selection.cache { types.formUnion(cacheTypes) }
         guard !types.isEmpty else { return }
-        await WKWebsiteDataStore.default().removeData(ofTypes: types, modifiedSince: since ?? .distantPast)
+        for dataStore in dataStores {
+            await dataStore.removeData(ofTypes: types, modifiedSince: since ?? .distantPast)
+        }
     }
 }

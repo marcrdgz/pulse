@@ -20,6 +20,7 @@ struct PulseApp: App {
         )
         browser.startHibernatingInactiveTabs()
         Task { await extensions.loadInstalled() }
+        Task { await browser.removeDeletedProfilesData() }
         return browser
     }()
 

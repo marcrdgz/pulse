@@ -316,7 +316,7 @@ struct ClearBrowsingDataView: View {
                 Button("Clear Data") {
                     isClearing = true
                     Task {
-                        await BrowsingDataCleaner.clear(selection, in: range, history: browser.history)
+                        await BrowsingDataCleaner.clear(selection, in: range, history: browser.history, dataStores: browser.allDataStores)
                         browser.showToast("Browsing data cleared")
                         dismiss()
                     }

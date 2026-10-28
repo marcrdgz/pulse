@@ -11,13 +11,14 @@ struct PrivateBrowserTests {
         let first = Browser.makePrivate(contentBlocker: main.contentBlocker, preferences: main.preferences)
         let second = Browser.makePrivate(contentBlocker: main.contentBlocker, preferences: main.preferences)
         #expect(first.isPrivate && first.activeSpace.name == "Private")
-        #expect(!first.websiteDataStore.isPersistent)
-        #expect(first.websiteDataStore !== second.websiteDataStore)
+        let firstStore = first.dataStore(for: Profile.defaultID)
+        #expect(!firstStore.isPersistent)
+        #expect(firstStore !== second.dataStore(for: Profile.defaultID))
 
         let privateTab = first.openTab(url: URL(string: "about:blank")!)
         privateTab.webView.loadHTMLString("<title>Ready</title>", baseURL: site)
         try await waitUntil { privateTab.title == "Ready" }
-        #expect(privateTab.webView.configuration.websiteDataStore === first.websiteDataStore)
+        #expect(privateTab.webView.configuration.websiteDataStore === firstStore)
         _ = try await privateTab.webView.evaluateJavaScript("localStorage.setItem('secret', '1'); 0")
 
         let otherTab = second.openTab(url: URL(string: "about:blank")!)

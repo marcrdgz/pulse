@@ -226,6 +226,8 @@ struct BrowserWindow: View {
 
     private func webPage(for tab: Tab, isFocused: Bool, roundsTopCorners: Bool = true) -> some View {
         WebView(tab: tab, takesFocus: isFocused, roundsTopCorners: roundsTopCorners)
+            // A tab that changes profile gets a new web view, which a new container picks up.
+            .id(browser.profileID(of: tab))
             .overlay {
                 if let error = tab.loadError {
                     LoadErrorView(tab: tab, error: error)
