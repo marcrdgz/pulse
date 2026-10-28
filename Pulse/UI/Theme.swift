@@ -47,6 +47,7 @@ enum Theme {
         case .general: 0xF5862A
         case .search: 0xE8506A
         case .downloads: 0xD2337E
+        case .profiles: 0xA43FC4
         case .privacy: 0x7B4DFF
         case .extensions: 0x4B3BB8
         }
