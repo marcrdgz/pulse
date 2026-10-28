@@ -51,12 +51,9 @@ enum ChromeImportError: LocalizedError {
 
 /// Reads Chrome's data folder: its profiles and each profile's bookmarks, history and cookies.
 enum ChromeImport {
-    /// Where Chrome keeps its profiles. In the sandbox the home directory is the app's container,
-    /// so this resolves the real one; reading it still needs the user to pick it in an open panel.
+    /// Where Chrome keeps its profiles.
     static var defaultDirectory: URL {
-        let home = getpwuid(getuid()).map { String(cString: $0.pointee.pw_dir) } ?? NSHomeDirectory()
-        return URL(filePath: home, directoryHint: .isDirectory)
-            .appending(path: "Library/Application Support/Google/Chrome", directoryHint: .isDirectory)
+        URL.homeDirectory.appending(path: "Library/Application Support/Google/Chrome", directoryHint: .isDirectory)
     }
 
     /// The last used profile first, then by name. Empty when `chromeDirectory` isn't Chrome's folder.

@@ -64,7 +64,7 @@ final class HistoryStore {
     }
 
     static func standard() -> HistoryStore? {
-        let directory = URL.applicationSupportDirectory.appending(path: "Pulse", directoryHint: .isDirectory)
+        let directory = URL.pulseSupportDirectory
         try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         return HistoryStore(path: directory.appending(path: "History.sqlite").path)
     }

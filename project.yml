@@ -28,14 +28,10 @@ targets:
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         CODE_SIGN_IDENTITY: "-"
         ENABLE_HARDENED_RUNTIME: YES
-        ENABLE_APP_SANDBOX: YES
-        ENABLE_OUTGOING_NETWORK_CONNECTIONS: YES
-        ENABLE_USER_SELECTED_FILES: readwrite
-        ENABLE_FILE_ACCESS_DOWNLOADS_FOLDER: readwrite
         ENABLE_RESOURCE_ACCESS_CAMERA: YES
         ENABLE_RESOURCE_ACCESS_AUDIO_INPUT: YES
       # Debug builds are a separate app so they never touch the installed browser:
-      # the sandbox container (session, history, cookies) is keyed by bundle ID,
+      # its data (session, history, cookies) is keyed by bundle ID,
       # and the distinct process name keeps `make run` from quitting the real Pulse.
       configs:
         Debug:

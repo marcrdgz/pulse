@@ -3,8 +3,13 @@ import SwiftUI
 @main
 struct PulseApp: App {
     @State private var browser: Browser = {
+        SandboxContainerMigration.run(
+            bundleID: Bundle.main.bundleIdentifier ?? "dev.doblefilo.pulse",
+            home: .homeDirectory,
+            defaults: .standard
+        )
         let preferences = Preferences(defaults: .standard)
-        let supportDirectory = URL.applicationSupportDirectory.appending(path: "Pulse", directoryHint: .isDirectory)
+        let supportDirectory = URL.pulseSupportDirectory
         let extensions = WebExtensions(
             directory: supportDirectory.appending(path: "Extensions", directoryHint: .isDirectory),
             defaults: .standard

@@ -83,7 +83,6 @@ struct OnboardingView: View {
 }
 
 /// Picks Chrome's folder and a profile, then imports its history and bookmarks bar.
-/// The sandbox only lets Pulse read the folder once the user chooses it in an open panel.
 struct ChromeImportView: View {
     let finishTitle: String
     let onFinish: () -> Void

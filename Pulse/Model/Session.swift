@@ -88,7 +88,7 @@ struct SessionStore {
     let fileURL: URL
 
     static var standard: SessionStore {
-        let directory = URL.applicationSupportDirectory.appending(path: "Pulse", directoryHint: .isDirectory)
+        let directory = URL.pulseSupportDirectory
         return SessionStore(fileURL: directory.appending(path: "session.json"))
     }
 
