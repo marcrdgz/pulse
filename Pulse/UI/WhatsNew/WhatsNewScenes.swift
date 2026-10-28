@@ -187,7 +187,8 @@ private struct Looping<Phase: Equatable, Content: View>: View {
 }
 
 /// A Pulse window in miniature: a sidebar of tabs beside a page.
-private struct MiniWindow<Page: View, AddressAccessory: View>: View {
+struct MiniWindow<Page: View, AddressAccessory: View>: View {
+    var theme = SpaceTheme.purple
     var activeRow: Int? = 0
     var dimmedRow: Int?
     @ViewBuilder var page: Page
@@ -225,7 +226,7 @@ private struct MiniWindow<Page: View, AddressAccessory: View>: View {
                 .padding([.vertical, .trailing], 6)
         }
         .frame(width: 440, height: 220)
-        .background(Theme.sidebarGradient(.purple))
+        .background(Theme.sidebarGradient(theme))
         .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
         .shadow(color: .black.opacity(0.2), radius: 12, y: 6)
     }
@@ -251,7 +252,7 @@ private struct MiniTabRow: View {
 }
 
 /// The lines of text on a page; they narrow with it in a split.
-private struct PageLines: View {
+struct PageLines: View {
     var widths: [CGFloat] = [0.9, 1, 0.75, 0.95, 0.6]
     var hasHeadline = true
 

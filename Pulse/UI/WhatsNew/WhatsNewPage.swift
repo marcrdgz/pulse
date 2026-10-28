@@ -109,7 +109,7 @@ struct WhatsNewPage: View {
 }
 
 /// A headline whose closing period is the flare, like the site's headings.
-private struct FlareHeadline: View {
+struct FlareHeadline: View {
     let text: String
 
     var body: some View {
