@@ -45,6 +45,8 @@ final class Space: Identifiable {
     var activeTabID: Tab.ID?
     /// A tab is in at most one split.
     var splits: [TabSplit]
+    /// Whose cookies, site data and favorites the space uses.
+    var profileID: Profile.ID
 
     init(
         id: UUID = UUID(),
@@ -54,7 +56,8 @@ final class Space: Identifiable {
         pinnedTabs: [Tab] = [],
         todayTabs: [Tab] = [],
         activeTabID: Tab.ID? = nil,
-        splits: [TabSplit] = []
+        splits: [TabSplit] = [],
+        profileID: Profile.ID = Profile.defaultID
     ) {
         self.id = id
         self.name = name
@@ -64,6 +67,7 @@ final class Space: Identifiable {
         self.todayTabs = todayTabs
         self.activeTabID = activeTabID
         self.splits = splits
+        self.profileID = profileID
         removeStaleSplits()
     }
 

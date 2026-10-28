@@ -31,8 +31,10 @@ enum CommandBarMode: Hashable {
 
 @Observable
 final class Browser: NSObject {
-    /// Shared by every space, shown as the favicon grid.
-    private(set) var favorites: [Tab] = []
+    /// The default profile first. Private windows only use the default one.
+    private(set) var profiles: [Profile] = [.default]
+    /// Shared by every space of a profile, shown as the favicon grid.
+    private var favoritesByProfile: [Profile.ID: [Tab]] = [:]
     /// Never empty.
     private(set) var spaces: [Space]
     private(set) var activeSpaceID: Space.ID
@@ -68,7 +70,12 @@ final class Browser: NSObject {
     @ObservationIgnored let contentBlocker: ContentBlocker
     /// `nil` in private windows, which run no extensions.
     @ObservationIgnored let extensions: WebExtensions?
-    @ObservationIgnored let websiteDataStore: WKWebsiteDataStore
+    /// Private windows keep every page's data in this one in-memory store.
+    @ObservationIgnored private let privateDataStore: WKWebsiteDataStore?
+    /// One per profile but the default, made when a page first needs it.
+    @ObservationIgnored private var profileDataStores: [Profile.ID: WKWebsiteDataStore] = [:]
+    /// Without a restored session every profile would look deleted.
+    @ObservationIgnored private var didRestoreSession = false
     @ObservationIgnored let faviconLoader: FaviconLoader
     /// The window showing this browser, so event monitors only act on their own window's events.
     @ObservationIgnored weak var window: NSWindow?
@@ -109,7 +116,7 @@ final class Browser: NSObject {
         self.extensions = extensions
         self.preferences = preferences
         self.isPrivate = isPrivate
-        websiteDataStore = isPrivate ? .nonPersistent() : .default()
+        privateDataStore = isPrivate ? .nonPersistent() : nil
         faviconLoader = isPrivate ? .ephemeral : .shared
         super.init()
         downloads.browser = self
@@ -144,13 +151,29 @@ final class Browser: NSObject {
         spaces.first { $0.id == activeSpaceID } ?? spaces[0]
     }
 
+    /// The active space's profile's favorites.
+    private(set) var favorites: [Tab] {
+        get { favorites(in: activeSpace.profileID) }
+        set { favoritesByProfile[activeSpace.profileID] = newValue }
+    }
+
+    func favorites(in profileID: Profile.ID) -> [Tab] {
+        favoritesByProfile[profileID] ?? []
+    }
+
+    /// Every tab of every profile, in a stable order.
+    var tabsInAllProfiles: [Tab] {
+        profiles.flatMap { favorites(in: $0.id) } + spaces.flatMap(\.tabs)
+    }
+
     var pinnedTabs: [Tab] { activeSpace.pinnedTabs }
     var todayTabs: [Tab] { activeSpace.todayTabs }
 
     /// Favorites, then the active space's pinned and today tabs: the order ⌘1…⌘9 and tab cycling follow.
     var allTabs: [Tab] { favorites + activeSpace.tabs }
 
-    /// Every open tab, the active space's first; what the command bar searches.
+    /// Every tab reachable from the sidebar of some space, the active space's first; what the
+    /// command bar searches. Favorites of profiles other than the active one are left out.
     var everyTab: [Tab] {
         allTabs + spaces.filter { $0.id != activeSpaceID }.flatMap(\.tabs)
     }
@@ -388,7 +411,9 @@ final class Browser: NSObject {
             if space.activeTabID == tab.id {
                 if space.id == activeSpaceID { isFindBarVisible = false }
                 // Like Chrome, closing a popup or a link opened in a new tab returns to the page that opened it.
-                let opener = tab.opener.flatMap { opener in (favorites + space.tabs).first { $0 === opener } }
+                let opener = tab.opener.flatMap { opener in
+                    (favorites(in: space.profileID) + space.tabs).first { $0 === opener }
+                }
                 let neighbor = space.todayTabs.indices.contains(index) ? space.todayTabs[index] : space.todayTabs.last
                 space.activeTabID = (partner ?? opener ?? neighbor)?.id
             }
@@ -457,7 +482,7 @@ final class Browser: NSObject {
         guard let delay = preferences.tabSleepDelay.duration else { return }
         let shownTabs = visibleTabs
         shownTabs.forEach { $0.wasShown(at: now) }
-        for tab in everyTab where !shownTabs.contains(tab) && now.timeIntervalSince(tab.lastShown) >= delay {
+        for tab in tabsInAllProfiles where !shownTabs.contains(tab) && now.timeIntervalSince(tab.lastShown) >= delay {
             // Checked last: it asks the web process, and the tab may be shown again meanwhile.
             if await tab.canHibernate(), !visibleTabs.contains(tab) { tab.hibernate() }
         }
@@ -467,11 +492,12 @@ final class Browser: NSObject {
     func clearSiteData(for tab: Tab) async {
         guard let host = tab.url.host(), let site = tab.url.displayHost else { return }
         let types = WKWebsiteDataStore.allWebsiteDataTypes()
+        let dataStore = dataStore(for: tab)
         // Records are named by registrable domain, e.g. `google.com` for `mail.google.com`.
-        let records = await websiteDataStore.dataRecords(ofTypes: types).filter {
+        let records = await dataStore.dataRecords(ofTypes: types).filter {
             host == $0.displayName || host.hasSuffix("." + $0.displayName)
         }
-        await websiteDataStore.removeData(ofTypes: types, for: records)
+        await dataStore.removeData(ofTypes: types, for: records)
         tab.reload()
         showToast("Cleared Data for \(site)")
     }
@@ -522,7 +548,7 @@ final class Browser: NSObject {
 
     /// Applies new lists, or a changed setting, to every page that's loaded.
     func contentRulesDidChange() {
-        everyTab.forEach { $0.applyContentRules(forPageAt: $0.url) }
+        tabsInAllProfiles.forEach { $0.applyContentRules(forPageAt: $0.url) }
     }
 
     /// Allows or blocks ads on the tab's site and reloads it, so the page shows the change.
@@ -723,6 +749,7 @@ final class Browser: NSObject {
     /// as needed. `destination.index` counts the section's tabs without the moved one.
     func moveTab(_ tab: Tab, to destination: TabPosition) {
         let wasPinned = tab.isPinned
+        let previousProfileID = profileID(of: tab)
         guard detach(tab) else { return }
         // Favorites belong to every space; a split stays within one.
         if destination.section == .favorites { separate(tab) }
@@ -738,15 +765,18 @@ final class Browser: NSObject {
             activeSpace.todayTabs.insert(tab, at: min(destination.index, activeSpace.todayTabs.count))
         }
         if tab.isPinned != wasPinned { extensions?.controller.didChangeTabProperties(.pinned, for: tab) }
+        if profileID(of: tab) != previousProfileID { tab.restartWebView() }
         scheduleSave()
     }
 
     /// Moves a tab to the top of another space's today tabs and follows it there.
     func moveTab(_ tab: Tab, to space: Space) {
+        let previousProfileID = profileID(of: tab)
         guard detach(tab) else { return }
         separate(tab)
         tab.pinnedURL = nil
         space.todayTabs.insert(tab, at: 0)
+        if space.profileID != previousProfileID { tab.restartWebView() }
         select(tab)
     }
 
@@ -758,8 +788,8 @@ final class Browser: NSObject {
     }
 
     private func detach(_ tab: Tab) -> Bool {
-        if let index = favorites.firstIndex(where: { $0.id == tab.id }) {
-            favorites.remove(at: index)
+        if let profileID = profileID(ofFavorite: tab) {
+            favoritesByProfile[profileID]?.removeAll { $0.id == tab.id }
             return true
         }
         guard let space = space(containing: tab) else { return false }
@@ -922,6 +952,111 @@ final class Browser: NSObject {
         scheduleSave()
     }
 
+    // MARK: Profiles
+
+    /// Where the tab's cookies and site data live. A tab in a space or the favorites uses its
+    /// profile's; Peek and pages not added anywhere yet use their opener's, or the active space's.
+    func dataStore(for tab: Tab) -> WKWebsiteDataStore {
+        dataStore(for: profileID(of: tab))
+    }
+
+    func dataStore(for profileID: Profile.ID) -> WKWebsiteDataStore {
+        if let privateDataStore { return privateDataStore }
+        if profileID == Profile.defaultID { return .default() }
+        if let dataStore = profileDataStores[profileID] { return dataStore }
+        let dataStore = WKWebsiteDataStore(forIdentifier: profileID)
+        profileDataStores[profileID] = dataStore
+        return dataStore
+    }
+
+    /// Every profile's, for clearing browsing data everywhere.
+    var allDataStores: [WKWebsiteDataStore] {
+        privateDataStore.map { [$0] } ?? profiles.map { dataStore(for: $0.id) }
+    }
+
+    func profileID(of tab: Tab) -> Profile.ID {
+        if let space = space(containing: tab) { return space.profileID }
+        if let profileID = profileID(ofFavorite: tab) { return profileID }
+        if let opener = tab.opener { return profileID(of: opener) }
+        return activeSpace.profileID
+    }
+
+    private func profileID(ofFavorite tab: Tab) -> Profile.ID? {
+        favoritesByProfile.first { $0.value.contains { $0.id == tab.id } }?.key
+    }
+
+    func profile(withID id: Profile.ID) -> Profile? {
+        profiles.first { $0.id == id }
+    }
+
+    /// Does nothing without a name.
+    @discardableResult
+    func createProfile(named name: String) -> Profile? {
+        let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return nil }
+        let profile = Profile(id: UUID(), name: trimmed)
+        profiles.append(profile)
+        scheduleSave()
+        return profile
+    }
+
+    /// The default profile keeps its name.
+    func rename(_ profile: Profile, to name: String) {
+        let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !profile.isDefault, !trimmed.isEmpty, let index = profiles.firstIndex(where: { $0.id == profile.id })
+        else { return }
+        profiles[index].name = trimmed
+        scheduleSave()
+    }
+
+    /// The space's tabs reload in the new profile, signed in as it is; favorites change with it.
+    func setProfile(_ profileID: Profile.ID, for space: Space) {
+        guard space.profileID != profileID, profile(withID: profileID) != nil else { return }
+        let previous = activeTab
+        if space.id == activeSpaceID { closePeek() }
+        space.profileID = profileID
+        space.tabs.forEach { $0.restartWebView() }
+        // The old profile's favorite it was showing isn't in its sidebar anymore.
+        repairActiveTab(of: space)
+        if space.id == activeSpaceID, activeTab == nil { commandBar = .newTab }
+        activeTabDidChange(from: previous)
+        scheduleSave()
+    }
+
+    /// Its spaces and favorites move to the default profile; its cookies and site data are deleted.
+    func delete(_ profile: Profile) {
+        guard !profile.isDefault, profiles.contains(where: { $0.id == profile.id }) else { return }
+        let previous = activeTab
+        closePeek()
+        let movedFavorites = favoritesByProfile.removeValue(forKey: profile.id) ?? []
+        favoritesByProfile[Profile.defaultID, default: []] += movedFavorites
+        let movedSpaces = spaces.filter { $0.profileID == profile.id }
+        movedSpaces.forEach { $0.profileID = Profile.defaultID }
+        (movedFavorites + movedSpaces.flatMap(\.tabs)).forEach { $0.restartWebView() }
+        profiles.removeAll { $0.id == profile.id }
+        profileDataStores[profile.id] = nil
+        activeTabDidChange(from: previous)
+        scheduleSave()
+        guard privateDataStore == nil else { return }
+        Task {
+            do {
+                try await WKWebsiteDataStore.remove(forIdentifier: profile.id)
+            } catch {
+                // Pages that just closed may still hold it; the next launch removes it.
+                Logger.session.error("Couldn't delete profile data yet: \(error.localizedDescription)")
+            }
+        }
+    }
+
+    /// Deletes the data of profiles deleted while WebKit still had it in use.
+    func removeDeletedProfilesData() async {
+        guard didRestoreSession, privateDataStore == nil else { return }
+        let profileIDs = Set(profiles.map(\.id))
+        for identifier in await WKWebsiteDataStore.allDataStoreIdentifiers where !profileIDs.contains(identifier) {
+            try? await WKWebsiteDataStore.remove(forIdentifier: identifier)
+        }
+    }
+
     func copyURL(of tab: Tab) {
         copy(tab.url, toast: "Copied Current URL")
     }
@@ -1035,7 +1170,7 @@ final class Browser: NSObject {
 
     var session: Session {
         Session(
-            favorites: favorites.map(Session.SavedTab.init),
+            favorites: favorites(in: Profile.defaultID).map(Session.SavedTab.init),
             spaces: spaces.map { space in
                 Session.SavedSpace(
                     id: space.id,
@@ -1045,10 +1180,18 @@ final class Browser: NSObject {
                     pinnedTabs: space.pinnedTabs.map(Session.SavedTab.init),
                     todayTabs: space.todayTabs.map(Session.SavedTab.init),
                     activeTabID: space.activeTabID,
-                    splits: space.splits.isEmpty ? nil : space.splits
+                    splits: space.splits.isEmpty ? nil : space.splits,
+                    profileID: space.profileID == Profile.defaultID ? nil : space.profileID
                 )
             },
-            activeSpaceID: activeSpaceID
+            activeSpaceID: activeSpaceID,
+            profiles: profiles.filter { !$0.isDefault }.map { profile in
+                Session.SavedProfile(
+                    id: profile.id,
+                    name: profile.name,
+                    favorites: favorites(in: profile.id).map(Session.SavedTab.init)
+                )
+            }
         )
     }
 
@@ -1077,7 +1220,12 @@ final class Browser: NSObject {
     }
 
     private func restore(_ session: Session) {
-        favorites = session.favorites.map(makeTab)
+        profiles = [.default] + session.profiles.map { Profile(id: $0.id, name: $0.name) }
+        favoritesByProfile[Profile.defaultID] = session.favorites.map(makeTab)
+        for saved in session.profiles {
+            favoritesByProfile[saved.id] = saved.favorites.map(makeTab)
+        }
+        let profileIDs = Set(profiles.map(\.id))
         let restoredSpaces = session.spaces.map { saved in
             Space(
                 id: saved.id,
@@ -1087,19 +1235,24 @@ final class Browser: NSObject {
                 pinnedTabs: saved.pinnedTabs.map(makeTab),
                 todayTabs: saved.todayTabs.map(makeTab),
                 activeTabID: saved.activeTabID,
-                splits: saved.splits ?? []
+                splits: saved.splits ?? [],
+                profileID: saved.profileID.flatMap { profileIDs.contains($0) ? $0 : nil } ?? Profile.defaultID
             )
         }
+        didRestoreSession = true
         guard let firstSpace = restoredSpaces.first else { return }
         spaces = restoredSpaces
         activeSpaceID = restoredSpaces.first { $0.id == session.activeSpaceID }?.id ?? firstSpace.id
 
-        // A saved active tab that no longer exists falls back to the space's first tab.
-        for space in spaces where space.activeTabID != nil {
-            let tabs = favorites + space.tabs
-            if !tabs.contains(where: { $0.id == space.activeTabID }) {
-                space.activeTabID = (space.todayTabs.first ?? space.pinnedTabs.first ?? favorites.first)?.id
-            }
+        spaces.forEach(repairActiveTab)
+    }
+
+    /// An active tab that no longer belongs to the space's sidebar falls back to its first tab.
+    private func repairActiveTab(of space: Space) {
+        guard space.activeTabID != nil else { return }
+        let favorites = favorites(in: space.profileID)
+        if !(favorites + space.tabs).contains(where: { $0.id == space.activeTabID }) {
+            space.activeTabID = (space.todayTabs.first ?? space.pinnedTabs.first ?? favorites.first)?.id
         }
     }
 
@@ -1108,7 +1261,7 @@ final class Browser: NSObject {
         for space in spaces {
             space.todayTabs.removeAll()
             space.removeStaleSplits()
-            if !(favorites + space.pinnedTabs).contains(where: { $0.id == space.activeTabID }) {
+            if !(favorites(in: space.profileID) + space.pinnedTabs).contains(where: { $0.id == space.activeTabID }) {
                 space.activeTabID = nil
             }
         }

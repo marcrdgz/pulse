@@ -3,7 +3,7 @@ import SwiftUI
 
 /// The Settings window's panes; stored so other windows can open it on a given pane.
 enum SettingsPane: String, CaseIterable, Identifiable {
-    case general, search, downloads, privacy, extensions
+    case general, search, downloads, profiles, privacy, extensions
 
     static let storageKey = "settingsPane"
 
@@ -14,6 +14,7 @@ enum SettingsPane: String, CaseIterable, Identifiable {
         case .general: "General"
         case .search: "Search"
         case .downloads: "Downloads"
+        case .profiles: "Profiles"
         case .privacy: "Privacy"
         case .extensions: "Extensions"
         }
@@ -24,6 +25,7 @@ enum SettingsPane: String, CaseIterable, Identifiable {
         case .general: "gearshape.fill"
         case .search: "magnifyingglass"
         case .downloads: "arrow.down"
+        case .profiles: "person.2.fill"
         case .privacy: "hand.raised.fill"
         case .extensions: "puzzlepiece.extension.fill"
         }
@@ -35,6 +37,7 @@ enum SettingsPane: String, CaseIterable, Identifiable {
         case .general: ["default browser", "startup", "peek", "pinned", "memory", "sleep", "tabs"]
         case .search: ["search engine", "suggestions", "address bar"]
         case .downloads: ["location", "finder", "save", "files"]
+        case .profiles: ["accounts", "logins", "cookies", "spaces", "favorites", "work", "personal"]
         case .privacy: ["history", "cookies", "cache", "clear browsing data", "ads", "trackers",
                         "permissions", "camera", "microphone"]
         case .extensions: ["install", "chrome web store", "zip", "crx", "options"]
@@ -81,6 +84,7 @@ struct SettingsView: View {
         case .general: GeneralSettings()
         case .search: SearchSettings()
         case .downloads: DownloadSettings()
+        case .profiles: ProfileSettings()
         case .privacy: PrivacySettings()
         case .extensions: ExtensionSettings()
         }
@@ -368,6 +372,57 @@ private struct ExtensionSettings: View {
             }
         }
         .settingsPane()
+    }
+}
+
+private struct ProfileSettings: View {
+    @Environment(Browser.self) private var browser
+    @State private var isNewProfilePresented = false
+
+    var body: some View {
+        Form {
+            Section {
+                ForEach(browser.profiles) { profile in
+                    ProfileRow(profile: profile, spaces: browser.spaces.filter { $0.profileID == profile.id })
+                }
+            } footer: {
+                Text(Profile.explanation + " Choose a space's profile when you create it, or from its menu in the sidebar.")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+            }
+            Section {
+                Button("New Profile…") { isNewProfilePresented = true }
+            }
+        }
+        .settingsPane()
+        .newProfileAlert(isPresented: $isNewProfilePresented)
+    }
+}
+
+/// Renamed in place; the default profile can be neither renamed nor deleted.
+private struct ProfileRow: View {
+    @Environment(Browser.self) private var browser
+    let profile: Profile
+    let spaces: [Space]
+    @State private var name = ""
+
+    var body: some View {
+        LabeledContent {
+            if !profile.isDefault {
+                Button("Delete…") { confirmDeleting(profile, in: browser) }
+            }
+        } label: {
+            if profile.isDefault {
+                Text(profile.name)
+            } else {
+                TextField("Name", text: $name)
+                    .labelsHidden()
+                    .onSubmit { browser.rename(profile, to: name) }
+                    .onAppear { name = profile.name }
+                    .onChange(of: profile.name) { name = profile.name }
+            }
+            Text(spaces.isEmpty ? "No spaces" : spaces.map(\.name).formatted(.list(type: .and)))
+        }
     }
 }
 

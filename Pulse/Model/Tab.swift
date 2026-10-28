@@ -138,6 +138,15 @@ final class Tab: NSObject, Identifiable {
         isHibernated = true
     }
 
+    /// WebKit can't move a web view to another data store: after the tab changes profile its page
+    /// reloads in a new one, keeping the back/forward list, signed in as the new profile.
+    func restartWebView() {
+        guard let loadedWebView else { return }
+        let state = loadedWebView.interactionState
+        unload()
+        hibernatedState = state
+    }
+
     func load(_ url: URL) {
         loadError = nil
         if let page = InternalPage(url: url) {
@@ -381,7 +390,7 @@ final class Tab: NSObject, Identifiable {
         // An extension's own pages (its options, say) only load with the configuration WebKit made for them.
         let configuration = extensions?.webViewConfiguration(forPageAt: url) ?? WKWebViewConfiguration()
         configuration.webExtensionController = extensions?.controller
-        configuration.websiteDataStore = browser?.websiteDataStore ?? .default()
+        configuration.websiteDataStore = browser?.dataStore(for: self) ?? .default()
         // Without a Safari token some sites (e.g. Google) serve degraded markup to WKWebView.
         configuration.applicationNameForUserAgent = Self.safariUserAgentToken
         // HTTPS first, like Safari: http pages load over https when the server supports it.

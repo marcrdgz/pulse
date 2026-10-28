@@ -63,7 +63,7 @@ extension Tab: WKWebExtensionTab {
 /// Pulse has one window per browser; extensions see every space's tabs in it, favorites first.
 extension Browser: WKWebExtensionWindow {
     /// A stable order, unlike `everyTab`, which changes with the active space.
-    var extensionTabs: [Tab] { favorites + spaces.flatMap(\.tabs) }
+    var extensionTabs: [Tab] { tabsInAllProfiles }
 
     func tabs(for context: WKWebExtensionContext) -> [any WKWebExtensionTab] { extensionTabs }
 

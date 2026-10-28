@@ -191,6 +191,14 @@ struct SpaceContextMenu: View {
                 Text(theme.displayName).tag(theme)
             }
         }
+        if browser.profiles.count > 1 {
+            // Its tabs reload signed in as the chosen profile.
+            Picker("Profile", selection: Binding(get: { space.profileID }, set: { browser.setProfile($0, for: space) })) {
+                ForEach(browser.profiles) { profile in
+                    Text(profile.name).tag(profile.id)
+                }
+            }
+        }
         Divider()
         Button("Close Today Tabs") { browser.closeTodayTabs(in: space) }
             .disabled(space.todayTabs.isEmpty)

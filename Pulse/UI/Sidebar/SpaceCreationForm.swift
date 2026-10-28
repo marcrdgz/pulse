@@ -6,6 +6,7 @@ struct SpaceCreationForm: View {
     @Environment(Browser.self) private var browser
     @Bindable var draft: Space
     @State private var isThemePickerExpanded = false
+    @State private var isNewProfilePresented = false
     @FocusState private var isNameFocused: Bool
 
     private var canCreate: Bool {
@@ -17,6 +18,9 @@ struct SpaceCreationForm: View {
             header
                 .padding(.bottom, 8)
             nameField
+            if !browser.isPrivate {
+                profileRow
+            }
             themeRow
             Spacer(minLength: 0)
             Button(action: create) {
@@ -120,6 +124,61 @@ struct SpaceCreationForm: View {
             RoundedRectangle(cornerRadius: Theme.rowCornerRadius, style: .continuous)
                 .fill(Theme.activeTabFill)
         )
+    }
+
+    /// Arc's profile pill: the profiles, then "New Profile…", which picks the one it creates.
+    private var profileRow: some View {
+        HStack(spacing: 10) {
+            Image(systemName: "face.smiling")
+                .font(.system(size: 13))
+                .frame(width: 24)
+                .opacity(0.7)
+            Text("Profile")
+                .font(.system(size: 13, weight: .semibold))
+            Menu {
+                Picker("Profile", selection: Binding(
+                    get: { draft.profileID },
+                    set: { browser.setProfile($0, for: draft) }
+                )) {
+                    ForEach(browser.profiles) { profile in
+                        Text(profile.name).tag(profile.id)
+                    }
+                }
+                .pickerStyle(.inline)
+                .labelsHidden()
+                Divider()
+                Button("New Profile…") { isNewProfilePresented = true }
+            } label: {
+                HStack(spacing: 4) {
+                    Text(browser.profile(withID: draft.profileID)?.name ?? Profile.default.name)
+                        .lineLimit(1)
+                    Image(systemName: "chevron.down")
+                        .font(.system(size: 9, weight: .bold))
+                }
+                .font(.system(size: 12, weight: .semibold))
+                .padding(.horizontal, 10)
+                .frame(height: 24)
+                .background(Capsule().fill(Theme.activeTabFill))
+                .contentShape(Capsule())
+            }
+            .menuStyle(.button)
+            .buttonStyle(.plain)
+            .menuIndicator(.hidden)
+            .fixedSize()
+            Spacer(minLength: 0)
+            Image(systemName: "info.circle")
+                .font(.system(size: 13))
+                .opacity(0.6)
+                .help(Profile.explanation)
+                .accessibilityLabel(Profile.explanation)
+        }
+        .padding(.horizontal, 8)
+        .frame(height: 40)
+        .background(
+            RoundedRectangle(cornerRadius: Theme.rowCornerRadius, style: .continuous)
+                .fill(Theme.pillFill)
+        )
+        .newProfileAlert(isPresented: $isNewProfilePresented) { browser.setProfile($0.id, for: draft) }
     }
 
     private var themeRow: some View {
