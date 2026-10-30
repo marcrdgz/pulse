@@ -3,7 +3,7 @@ import SwiftUI
 
 /// The Settings window's panes; stored so other windows can open it on a given pane.
 enum SettingsPane: String, CaseIterable, Identifiable {
-    case general, search, downloads, profiles, privacy, extensions
+    case general, search, downloads, profiles, privacy, extensions, ai
 
     static let storageKey = "settingsPane"
 
@@ -17,6 +17,7 @@ enum SettingsPane: String, CaseIterable, Identifiable {
         case .profiles: "Profiles"
         case .privacy: "Privacy"
         case .extensions: "Extensions"
+        case .ai: "AI"
         }
     }
 
@@ -28,6 +29,7 @@ enum SettingsPane: String, CaseIterable, Identifiable {
         case .profiles: "person.2.fill"
         case .privacy: "hand.raised.fill"
         case .extensions: "puzzlepiece.extension.fill"
+        case .ai: "sparkles"
         }
     }
 
@@ -41,6 +43,7 @@ enum SettingsPane: String, CaseIterable, Identifiable {
         case .privacy: ["history", "cookies", "cache", "clear browsing data", "ads", "trackers",
                         "permissions", "camera", "microphone"]
         case .extensions: ["install", "chrome web store", "zip", "crx", "options"]
+        case .ai: ["agents", "claude", "codex", "cursor", "mcp"]
         }
     }
 
@@ -87,6 +90,7 @@ struct SettingsView: View {
         case .profiles: ProfileSettings()
         case .privacy: PrivacySettings()
         case .extensions: ExtensionSettings()
+        case .ai: AISettings()
         }
     }
 }
@@ -423,6 +427,63 @@ private struct ProfileRow: View {
             }
             Text(spaces.isEmpty ? "No spaces" : spaces.map(\.name).formatted(.list(type: .and)))
         }
+    }
+}
+
+private struct AISettings: View {
+    @Environment(Browser.self) private var browser
+
+    var body: some View {
+        @Bindable var preferences = browser.preferences
+        Form {
+            Section {
+                Toggle(isOn: $preferences.allowsAgents) {
+                    Text("Let AI agents use Pulse")
+                    Text("Claude Code, Codex and other MCP clients on this Mac can read and act in your tabs, signed in as you. Pulse asks before they use one of your tabs, and before clicks that send, pay or delete.")
+                }
+                if let server = browser.agentServer, preferences.allowsAgents {
+                    LabeledContent("Status") {
+                        switch server.state {
+                        case .listening: Label("Ready", systemImage: "checkmark.circle.fill").foregroundStyle(.green)
+                        case .failed(let message): Text(message).foregroundStyle(.red)
+                        case .stopped: Text("Starting…").foregroundStyle(.secondary)
+                        }
+                    }
+                }
+            }
+            if preferences.allowsAgents {
+                Section {
+                    Text(connectCommand)
+                        .font(.system(size: 11, design: .monospaced))
+                        .textSelection(.enabled)
+                        .lineLimit(nil)
+                    HStack {
+                        Button("New Key", action: preferences.resetAgentToken)
+                            .help("Disconnects the agents set up with the current key")
+                        Spacer()
+                        Button("Copy Command") {
+                            NSPasteboard.general.clearContents()
+                            NSPasteboard.general.setString(connectCommand, forType: .string)
+                        }
+                    }
+                } header: {
+                    Text("Connect Claude Code")
+                } footer: {
+                    Text("Run this once in Terminal, then ask Claude Code to do something in your tabs.")
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                }
+            }
+        }
+        .settingsPane()
+        .onChange(of: preferences.allowsAgents) {
+            if preferences.allowsAgents { browser.agentServer?.start() } else { browser.agentServer?.stop() }
+        }
+    }
+
+    private var connectCommand: String {
+        "claude mcp add --scope user --transport http \(MCPServer.name) \(MCPServer.endpoint) "
+            + "--header \"Authorization: Bearer \(browser.preferences.agentToken)\""
     }
 }
 

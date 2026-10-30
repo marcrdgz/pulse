@@ -29,6 +29,9 @@ final class Tab: NSObject, Identifiable {
     var pinnedURL: URL?
     /// Set by the user from the sidebar; overrides the page title.
     var customTitle: String?
+    /// Cookies and storage of its own instead of the browser's, e.g. signed out for an AI agent.
+    /// Only takes effect if set before the page first loads.
+    @ObservationIgnored var websiteDataStore: WKWebsiteDataStore?
 
     @ObservationIgnored weak var browser: Browser?
     /// The tab whose page opened this one with `window.open` or `target=_blank`.
@@ -390,7 +393,7 @@ final class Tab: NSObject, Identifiable {
         // An extension's own pages (its options, say) only load with the configuration WebKit made for them.
         let configuration = extensions?.webViewConfiguration(forPageAt: url) ?? WKWebViewConfiguration()
         configuration.webExtensionController = extensions?.controller
-        configuration.websiteDataStore = browser?.dataStore(for: self) ?? .default()
+        configuration.websiteDataStore = websiteDataStore ?? browser?.dataStore(for: self) ?? .default()
         // Without a Safari token some sites (e.g. Google) serve degraded markup to WKWebView.
         configuration.applicationNameForUserAgent = Self.safariUserAgentToken
         // HTTPS first, like Safari: http pages load over https when the server supports it.

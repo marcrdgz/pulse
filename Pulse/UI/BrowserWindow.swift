@@ -253,8 +253,38 @@ struct BrowserWindow: View {
                         .transition(.opacity)
                 }
             }
+            .overlay { agentOverlay(for: tab) }
             .animation(.snappy(duration: 0.2), value: browser.activePermissionRequest?.id)
             .animation(.easeOut(duration: 0.12), value: tab.hoveredLink == nil)
+    }
+
+    /// While an agent works in the tab: a glow around the page, and a bar at the bottom with its status or its question.
+    @ViewBuilder private func agentOverlay(for tab: Tab) -> some View {
+        if let agent = browser.agent {
+            let activity = agent.activities[tab.id]
+            let request = agent.request(for: tab)
+            ZStack {
+                if let activity, !activity.isDone {
+                    RoundedRectangle(cornerRadius: Theme.contentCornerRadius, style: .continuous)
+                        .strokeBorder(Theme.agentTint.opacity(0.7), lineWidth: 3)
+                        .allowsHitTesting(false)
+                }
+                // One bar at the bottom of the page: a question replaces the status until answered.
+                Group {
+                    if let request {
+                        AgentPrompt(agent: agent, request: request)
+                            .id(request.id)
+                    } else if let activity {
+                        AgentDock(agent: agent, tab: tab, activity: activity)
+                    }
+                }
+                .padding(.bottom, 18)
+                .frame(maxHeight: .infinity, alignment: .bottom)
+                .transition(.slide(from: .bottom, reduceMotion: reduceMotion))
+            }
+            .animation(.snappy(duration: 0.2), value: request?.id)
+            .animation(.snappy(duration: 0.2), value: activity == nil)
+        }
     }
 
     /// A link previewed in a card over the dimmed page, like Arc's Peek. Clicking beside it or
@@ -332,6 +362,20 @@ struct BrowserWindow: View {
             if modifiers == .control, let number = event.charactersIgnoringModifiers.flatMap(Int.init), (1...9).contains(number) {
                 browser.selectSpace(number: number)
                 return nil
+            }
+            // The agent's bar answers to ↩ and Esc, and ⌘. takes the tab back, even while the page
+            // has focus and would otherwise take the keys.
+            if let agent = browser.agent, let tab = browser.focusedTab, browser.commandBar == nil {
+                if modifiers.isEmpty, [36, 76, 53].contains(event.keyCode), let request = agent.request(for: tab),
+                   Date.now.timeIntervalSince(request.shownAt) > 0.8 {
+                    agent.answer(request, allow: event.keyCode != 53)
+                    return nil
+                }
+                if modifiers == .command, event.charactersIgnoringModifiers == ".",
+                   agent.activities[tab.id]?.isDone == false {
+                    agent.takeOver(tab)
+                    return nil
+                }
             }
             // Esc closes Peek, unless the command bar or find bar is open and takes it.
             if event.keyCode == 53, modifiers.isEmpty, browser.peek != nil,

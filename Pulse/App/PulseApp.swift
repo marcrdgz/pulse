@@ -24,6 +24,7 @@ struct PulseApp: App {
             preferences: preferences
         )
         browser.startHibernatingInactiveTabs()
+        if preferences.allowsAgents { browser.agentServer?.start() }
         Task { await extensions.loadInstalled() }
         Task { await browser.removeDeletedProfilesData() }
         return browser
