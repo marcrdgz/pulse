@@ -41,6 +41,8 @@ final class Tab: NSObject, Identifiable {
     @ObservationIgnored private var observations: [NSKeyValueObservation] = []
     @ObservationIgnored private var appliedRuleListIDs: [String] = []
     @ObservationIgnored private var audioObservation: NSObject?
+    /// Held while the page plays fullscreen, so watching doesn't let the display sleep.
+    @ObservationIgnored private var displaySleepAssertion: DisplaySleepAssertion?
     /// The back/forward list and scroll position saved when the tab went to sleep.
     @ObservationIgnored private var hibernatedState: Any?
     /// Pages opened by script keep a live `window.opener` (sign-in popups), which a reload would cut.
@@ -265,6 +267,7 @@ final class Tab: NSObject, Identifiable {
         observations.removeAll()
         audioObservation = nil
         isPlayingAudio = false
+        displaySleepAssertion = nil
         appliedRuleListIDs = []
         hibernatedState = nil
         isHibernated = false
@@ -330,6 +333,7 @@ final class Tab: NSObject, Identifiable {
             webView.observe(\.microphoneCaptureState) { [weak self] _, _ in MainActor.assumeIsolated { self?.syncWithWebView() } },
             webView.observe(\.themeColor) { [weak self] _, _ in MainActor.assumeIsolated { self?.syncWithWebView() } },
             webView.observe(\.underPageBackgroundColor) { [weak self] _, _ in MainActor.assumeIsolated { self?.syncWithWebView() } },
+            webView.observe(\.fullscreenState) { [weak self] _, _ in MainActor.assumeIsolated { self?.updateDisplaySleep() } },
         ]
         return webView
     }
@@ -338,6 +342,14 @@ final class Tab: NSObject, Identifiable {
         guard isPlaying != isPlayingAudio else { return }
         isPlayingAudio = isPlaying
         browser?.extensions?.controller.didChangeTabProperties(.playingAudio, for: self)
+        updateDisplaySleep()
+    }
+
+    /// Fullscreen with sound is someone watching; audio alone (music in the background) isn't.
+    private func updateDisplaySleep() {
+        let isWatching = isPlayingAudio && loadedWebView?.fullscreenState == .inFullscreen
+        guard isWatching != (displaySleepAssertion != nil) else { return }
+        displaySleepAssertion = isWatching ? DisplaySleepAssertion(reason: "Pulse is playing fullscreen video") : nil
     }
 
     private func syncWithWebView() {
