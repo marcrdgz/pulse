@@ -11,6 +11,23 @@ final class BrowserWebView: WKWebView {
         return true
     }
 
+    /// ⌘← / ⌘→ go back / forward like Safari, but only when the page doesn't use the keys: a text
+    /// field takes them to move the caret. WebKit claims every key equivalent, hands it to the page,
+    /// and resends the ones the page left alone, which is when `super` returns false.
+    /// Not menu shortcuts: the menu would take them from Pulse's own text fields first.
+    override func performKeyEquivalent(with event: NSEvent) -> Bool {
+        if super.performKeyEquivalent(with: event) { return true }
+        let modifiers = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
+            .subtracting([.numericPad, .function])
+        guard modifiers == .command else { return false }
+        switch event.specialKey {
+        case .leftArrow? where canGoBack: goBack()
+        case .rightArrow? where canGoForward: goForward()
+        default: return false
+        }
+        return true
+    }
+
     override func willOpenMenu(_ menu: NSMenu, with event: NSEvent) {
         super.willOpenMenu(menu, with: event)
         (uiDelegate as? WebViewCoordinator)?.customize(menu, in: self)
